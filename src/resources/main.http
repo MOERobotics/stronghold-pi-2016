@@ -7,8 +7,132 @@ Content-Type: text/html\r\n
 <html>
 	<head>
 		<title>MOE Pi Server</title>
+		<style type="text/css">
+			img, canvas {
+				position: fixed;
+				top: 0;
+				left: 0;
+				height: 100%;
+				width: 100%;
+			}
+			button {
+				position: fixed;
+				top: 0;
+				right: 0;
+				opacity: .5;
+				transition: opacity .5s;
+				border-bottom-left-radius: 50px;
+				border-width: 0;
+				padding: 1px 2px 6px 10px;
+				outline: none;
+			}
+			button:hover {
+				opacity: 1;
+			}
+			.lock-label {
+				position: fixed;
+				bottom: 0;
+				right: 0;
+			}
+			.locked:before {
+				color: red;
+				content: 'Locked';
+			}
+			.unlocked:before {
+				color: yellow;
+				content: 'Unlocked';
+			}
+		</style>
 	</head>
 	<body>
 		<img src="stream.jpg"/>
+		<canvas></canvas>
+		<button onclick="window.open(document.URL+'#no_popup','_blank','height=240,width=320,chrome=yes,scrollbars=yes,status=no,menubar=no,toolbar=no,location=no')">F</button>
+		<span class="lock-label locked"></span>
+		<script type="application/javascript">
+			var $_ = document.querySelector.bind(document);
+			if (window.location.hash.indexOf('no_popup')>=0)
+				$_('button').remove();
+			var cvs = $_('canvas');
+			cvs.width = cvs.getClientRects()[0].width;
+			cvs.height = cvs.getClientRects()[0].height;
+			var img = $_('img');
+			var ctx = cvs.getContext('2d');
+			ctx.lineWidth=2;
+			ctx.strokeStyle='#F00';
+			var locked = true;
+			var overlay = {x:.5,y:.5};
+			if ('overlay' in localStorage)
+				overlay = JSON.parse(localStorage['overlay']);
+			overlay.x *= cvs.width;
+			overlay.y *= cvs.height;
+			function updateOverlay() {
+				ctx.clearRect(0,0,cvs.width, cvs.height);
+				ctx.beginPath();
+				ctx.moveTo(overlay.x, 0);
+				ctx.lineTo(overlay.x, cvs.height);
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.moveTo(0, overlay.y);
+				ctx.lineTo(cvs.width, overlay.y);
+				ctx.stroke();
+				console.info('Drawing overlay',{x:overlay.x,y:overlay.y,px:overlay.x/cvs.width,py:overlay.y/cvs.height});
+			}
+			updateOverlay();
+			function reset() {
+				if (locked) {
+					console.error("Overlay is locked. Press 'l' to unlock.");
+					return;
+				}
+				overlay = {x: cvs.width/2, y: cvs.height/2};
+				localStorage['overlay'] = JSON.stringify({x:.5,y:.5});
+				updateOverlay();
+			}
+			function move(dx, dy) {
+				if (locked) {
+					console.error("Overlay is locked. Press 'l' to unlock.");
+					return;
+				}
+				console.log('moving overlay',{dx:dx,dy:dy});
+				overlay.x+= dx;
+				overlay.y+= dy;
+				localStorage['overlay'] = JSON.stringify({x:overlay.x/cvs.width,y:overlay.y/cvs.height});
+				updateOverlay();
+			}
+			document.addEventListener('keydown',function(e) {
+				var dx = 0, dy = 0;
+				console.log('keydown',{key:e.key, code:e.code});
+				if (e.code == 'ArrowDown') {
+					dy++;
+				} else if (e.code == 'ArrowUp') {
+					dy--;
+				} else if (e.code == 'ArrowLeft') {
+					dx--;
+				} else if (e.code == 'ArrowRight') {
+					dx++;
+				} else if (e.code == 'KeyR') {
+					return reset();
+				} else if (e.code == 'KeyL') {
+					locked = !locked;
+					console.warn('Overlay is ' + (locked ? '' : 'not ') + 'locked.');
+					$_('.lock-label').classList.remove('locked','unlocked');
+					$_('.lock-label').classList.add(locked ? 'locked' : 'unlocked');
+					return;
+				} else {
+					console.error('Unknown key pressed', e);
+					return;
+				}
+				if (!e.shiftKey) {
+					dx*=5;
+					dy*=5;
+					if (e.ctrlKey) {
+						dx*=2;
+						dy*=2;
+					}
+				}
+				move(dx, dy);
+			});
+			console.log('loaded');
+		</script>
 	</body>
 </html>

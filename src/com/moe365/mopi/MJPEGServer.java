@@ -11,7 +11,6 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -86,7 +85,7 @@ public class MJPEGServer implements Runnable {
 	}
 
 	public void start() {
-		System.out.println("Starting MJPEG server @ :" + serverSocket.socket().getLocalPort());
+		System.out.println("Starting MJPEG server @ " + address.toString());
 		if (executor == null) {
 			run();
 		} else {
@@ -123,6 +122,7 @@ public class MJPEGServer implements Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		System.out.println("Server stopped.");
 	}
 	
 	public void onNextFrame(VideoFrame frame) {

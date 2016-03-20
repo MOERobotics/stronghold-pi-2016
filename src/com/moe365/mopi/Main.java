@@ -9,14 +9,23 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
+import com.pi4j.io.gpio.GpioController;
+import com.pi4j.io.gpio.GpioFactory;
+import com.pi4j.io.gpio.GpioPinDigitalOutput;
+import com.pi4j.io.gpio.PinMode;
+import com.pi4j.io.gpio.PinState;
+import com.pi4j.io.gpio.RaspiPin;
 
 import au.edu.jcu.v4l4j.CaptureCallback;
+import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
 import au.edu.jcu.v4l4j.VideoDevice;
 import au.edu.jcu.v4l4j.VideoFrame;
+import au.edu.jcu.v4l4j.encoder.JPEGEncoder;
 import au.edu.jcu.v4l4j.exceptions.V4L4JException;
 
 /**
@@ -44,26 +53,63 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final String version = "0.0.0-alpha";
+	public static int width;
+	public static int height;
 	public static void main(String...fred) throws IOException, V4L4JException {
 		CommandLineParser parser = loadParser();
 		ParsedCommandLineArguments parsed = parser.apply(fred);
+		
 		if (parsed.isFlagSet("--help")) {
 			System.out.println(parser.getHelpString());
 			return;
 		}
 		
+		if (parsed.isFlagSet("--rebuild-parser")) {
+			buildParser();
+			return;
+		}
+		
+		width = parsed.getOrDefault("--width", 640);
+		height = parsed.getOrDefault("--height", 480);
+		System.out.println("Frame size: " + width + "x" + height);
+		
 		final MJPEGServer server = initServer(parsed);
 		
 		final VideoDevice device = initCamera(parsed);
 		
-		JPEGFrameGrabber fg = device.getJPEGFrameGrabber(640, 480, 0, V4L4JConstants.STANDARD_WEBCAM, 80);
-		fg.setFrameInterval(1, 10);
+		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
+		
+		final ImageProcessor tracer = parsed.isFlagSet("--no-process") ? null : new ImageProcessor(width, height);//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
+		final AtomicBoolean ledState = new AtomicBoolean(false);
+		
+		if (parsed.isFlagSet("--test")) {
+			String target = parsed.get("--test");
+			switch (target) {
+				case "converter":
+					testConverter(device);
+					return;
+				default:
+					System.err.println("Unknown test '" + target + "'");
+			}
+		}
+		
+		JPEGFrameGrabber fg = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, parsed.getOrDefault("--jpeg-quality", 80));
+		fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
+		System.out.println("Framerate: " + fg.getFrameInterval());
 		fg.setCaptureCallback(new CaptureCallback() {
 			@Override
 			public void nextFrame(VideoFrame frame) {
 				if (server != null)
 					server.onNextFrame(frame);
-				frame.recycle();
+				if (tracer != null) {
+					tracer.update(frame, ledState.get());
+					System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
+				gpioPin.setState(ledState.get());
+				ledState.set(!ledState.get());
+				} else {
+					frame.recycle();
+				}
+//				tracer.run();
 			}
 
 			@Override
@@ -74,14 +120,28 @@ public class Main {
 		});
 		fg.startCapture();
 	}
-	protected static MJPEGServer initServer(ParsedCommandLineArguments args) throws IOException {
-		int port = 5800;
-		if (args.isFlagSet("--port")) {
-			try {
-				port = Integer.parseInt(args.get("--port"));
-			} catch (NumberFormatException | NullPointerException e) {}
+	/**
+	 * Initialize the GPIO, getting the pin that the LED is attached to.
+	 * @param args parsed command line arguments
+	 * @return LED pin
+	 */
+	protected static GpioPinDigitalOutput initGpio(ParsedCommandLineArguments args) {
+		final GpioController gpio = GpioFactory.getInstance();
+		GpioPinDigitalOutput pin;
+		if (args.isFlagSet("--gpio-pin")) {
+			pin = gpio.provisionDigitalOutputPin(RaspiPin.getPinByName(args.get("--gpio-pin")), "LED pin", PinState.LOW);
+		} else {
+			pin = gpio.provisionDigitalOutputPin(RaspiPin.GPIO_01, "LED pin", PinState.LOW);
 		}
-		if (port < 0 || !args.isFlagSet("--no-server")) {
+		System.out.println("Using GPIO pin " + pin.getPin());
+		pin.setMode(PinMode.DIGITAL_OUTPUT);
+		pin.setState(false);
+		return pin;
+	}
+	protected static MJPEGServer initServer(ParsedCommandLineArguments args) throws IOException {
+		int port = args.getOrDefault("--port", 5800);
+		
+		if (port > 0 && !args.isFlagSet("--no-server")) {
 			MJPEGServer server = new MJPEGServer(new InetSocketAddress(port));
 			server.runOn(Executors.newCachedThreadPool());
 			server.start();
@@ -89,10 +149,12 @@ public class Main {
 		}
 		return null;
 	}
+	protected static void testConverter(VideoDevice dev) {
+		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
+		
+	}
 	protected static VideoDevice initCamera(ParsedCommandLineArguments args) throws V4L4JException {
-		String devName = "/dev/video0";
-		if (args.isFlagSet("--camera"))
-			devName = args.get("--camera");
+		String devName = args.getOrDefault("--camera", "/dev/video0");
 		
 		VideoDevice device = new VideoDevice(devName);
 		System.out.println("Connected to camera @ " + device.getDevicefile());
@@ -104,9 +166,9 @@ public class Main {
 		} catch (IOException | ClassNotFoundException e) {
 			e.printStackTrace();
 		}
-		return null;
+		return buildParser();
 	}
-	protected static void buildParser() {
+	protected static CommandLineParser buildParser() {
 		CommandLineParser parser = CommandLineParser.builder()
 			.addFlag("--help", "Displays the help message and exits")
 			.alias("-h", "--help")
@@ -123,38 +185,26 @@ public class Main {
 			.addKvPair("--rio-addr", "address", "Specify where to find the RoboRio")
 			.addKvPair("--props", "file", "Specify the file to read properties from")
 			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future")
+			.addFlag("--rebuild-parser", "Rebuilds the parser object")
+			.addKvPair("--test", "target", "Run test by name")
+			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use")
+			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis")
+			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis")
+			.addKvPair("--width", "px", "Width of image")
+			.addKvPair("--height", "px", "Height of image")
+			.addKvPair("--fps-num", "numerator", "Set FPS numerator")
+			.addKvPair("--fps-denom", "denom", "Set FPS denominator")
+			.addFlag("--no-process", "Disable image processing")
+			.addKvPair("--jpeg-quality", "quality", "Set the JPEG quality to request")
 			.build();
-		File outputFile = new File("parser.ser");
+		File outputFile = new File("src/resources/parser.ser");
+		if (outputFile.exists())
+			outputFile.delete();
 		try (ObjectOutput out = new ObjectOutputStream(new FileOutputStream(outputFile))) {
 			out.writeObject(parser);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-	public static void printHelp() {
-		System.out.println("Moe Pi version " + version);
-		System.out.println();
-		System.out.println("Usage: java -jar moepi.jar <options>");
-		System.out.println("Options:");
-		System.out.println("  -?");
-		System.out.println("  -h");
-		System.out.println("  --help");
-		System.out.println("    Displays this message and exits");
-		System.out.println("  -C [device]");
-		System.out.println("  --camera [device]");
-		System.out.println("    Specify the camera to use");
-		System.out.println("  -v");
-		System.out.println("  --verbose");
-		System.out.println("    Enables verbose output");
-		System.out.println("  --out [file]");
-		System.out.println("    Specify file to write output to");
-		System.out.println("  -p [port]");
-		System.out.println("  --port [port]");
-		System.out.println("    Specify port to listen on.");
-		System.out.println("    Specifying port 0 will automatically select one.");
-		System.out.println("    Specifying a port <0 is equivalent to --no-server");
-		System.out.println("  --no-server");
-		System.out.println("  ");
-		
+		return parser;
 	}
 }

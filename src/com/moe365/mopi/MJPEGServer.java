@@ -41,7 +41,7 @@ public class MJPEGServer implements Runnable {
 		try (BufferedReader br = new BufferedReader(new InputStreamReader(Main.class.getResourceAsStream("/resources/" + name + ".http")))) {
 			StringBuilder sb = new StringBuilder();
 			while (br.ready())
-				sb.append(br.readLine().replace("\\r", "\r").replace("\\n", "\n"));
+				sb.append(br.readLine().replace("\t","").replace("\\t", "\t").replace("\\r", "\r").replace("\\n", "\n"));
 			tmp = sb.toString();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -67,7 +67,7 @@ public class MJPEGServer implements Runnable {
 	protected AtomicBoolean isWriteBufferLocked = new AtomicBoolean(false);
 	protected AtomicBoolean isImageAvailable = new AtomicBoolean(false);
 	protected ConcurrentHashMap<Long, SocketChannel> channelMap = new ConcurrentHashMap<>();
-	protected Set<Long> mjpegChannels = new HashSet<>();
+	protected volatile Set<Long> mjpegChannels = ConcurrentHashMap.newKeySet();
 	protected AtomicBoolean shouldBeRunning = new AtomicBoolean(false);
 
 	public MJPEGServer(SocketAddress address) throws IOException {
@@ -144,7 +144,7 @@ public class MJPEGServer implements Runnable {
 	}
 	
 	protected void attemptWriteNextFrame() {
-		if (!(this.isImageAvailable.get() && isWriteBufferLocked.compareAndSet(false, true)))
+		if (this.mjpegChannels.size() == 0 || !(this.isImageAvailable.get() && isWriteBufferLocked.compareAndSet(false, true)))
 			return;
 		System.out.print('W');
 		System.out.print(this.mjpegChannels.size());
@@ -204,7 +204,8 @@ public class MJPEGServer implements Runnable {
 		} catch (IOException e) {
 			channelMap.remove(id);
 			channel.close();
-			throw e;
+			e.printStackTrace();
+			return;
 		}
 		
 		this.readBuffer.flip();

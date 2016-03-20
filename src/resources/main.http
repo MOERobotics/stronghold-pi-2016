@@ -53,6 +53,7 @@ Content-Type: text/html\r\n
 			var $_ = document.querySelector.bind(document);
 			if (window.location.hash.indexOf('no_popup')>=0)
 				$_('button').remove();
+			var colors = ['#F00','#0F0','#00F','#FF0','#F0F','#0FF','purple','orange','pink','grey','chartreuse'];
 			var cvs = $_('canvas');
 			cvs.width = cvs.getClientRects()[0].width;
 			cvs.height = cvs.getClientRects()[0].height;
@@ -70,6 +71,8 @@ Content-Type: text/html\r\n
 			for (let overlay of overlays) {
 				overlay.x *= cvs.width;
 				overlay.y *= cvs.height;
+				if (!('c' in overlay))
+					overlay.c = Math.round(Math.random() * colors.length);
 			}
 			function updateOverlays() {
 				var w = cvs.width * .05;
@@ -77,7 +80,7 @@ Content-Type: text/html\r\n
 				console.groupCollapsed('Drawing overlays');
 				ctx.clearRect(0,0,cvs.width, cvs.height);
 				for (var i in overlays) {
-					ctx.strokeStyle = (i==selected && !locked) ? '#0F0' : '#F00';
+					ctx.strokeStyle = colors[overlays[i].c];
 					var x = overlays[i].x;
 					var y = overlays[i].y;
 					ctx.beginPath();
@@ -88,6 +91,11 @@ Content-Type: text/html\r\n
 					ctx.moveTo(x - w, y);
 					ctx.lineTo(x + w, y);
 					ctx.stroke();
+					if (i == selected && !locked) {
+						ctx.beginPath();
+						ctx.ellipse(x, y, w, h, 0, 0, 2 * Math.PI);
+						ctx.stroke();
+					}
 					console.info({x:x,y:y,px:overlays[i].x/cvs.width,py:overlays[i].y/cvs.height});
 				}
 				console.groupEnd();
@@ -104,7 +112,7 @@ Content-Type: text/html\r\n
 				for (let overlay of overlays) {
 					overlay.x = x;
 					overlay.y = y;
-					tmp.push({x:.5,y:.5});
+					tmp.push({x:.5,y:.5,c:overlay.c});
 				}
 				localStorage['overlays'] = JSON.stringify(tmp);
 				updateOverlay();
@@ -120,11 +128,11 @@ Content-Type: text/html\r\n
 				overlay.y += dy;
 				var tmp;
 				if ('overlays' in localStorage && (tmp = JSON.parse(localStorage['overlays'])).length == overlays.length) {
-					tmp[selected] = {x:overlay.x/cvs.width,y:overlay.y/cvs.height};
+					tmp[selected] = {x:overlay.x/cvs.width,y:overlay.y/cvs.height,c:overlays[selected].c};
 				} else {
 					tmp = [];
 					for (var overlay of overlays)
-						tmp.push({x:overlay.x/cvs.width,y:overlay.y/cvs.height});
+						tmp.push({x:overlay.x/cvs.width,y:overlay.y/cvs.height,c:overlays[selected].c});
 				}
 				localStorage['overlays'] = JSON.stringify(tmp);
 				updateOverlays();
@@ -149,6 +157,15 @@ Content-Type: text/html\r\n
 					$_('.lock-label').classList.add(locked ? 'locked' : 'unlocked');
 					updateOverlays();
 					return;
+				} else if (e.code == 'KeyC') {
+					if (locked) {
+						console.error("Overlays are locked. Press 'L' to unlock.");
+						return;
+					}
+					var overlay = overlays[selected];
+					overlay.c++;
+					if (overlay.c > colors.length - 1)
+						overlay.c = 0;
 				} else if (e.code == 'Tab') {
 					e.preventDefault();
 					if (locked) {

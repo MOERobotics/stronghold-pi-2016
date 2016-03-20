@@ -92,14 +92,42 @@ public class RoboRioClient implements Closeable, Runnable {
 	public static final short STATUS_REQUEST_CONFIG = 11;
 	public static final short STATUS_CONFIG = 12;
 	
+	/**
+	 * 8 bit packet
+	 */
 	protected DatagramPacket packet_8;
+	/**
+	 * 16 bit packet
+	 */
 	protected DatagramPacket packet_16;
+	/**
+	 * 24 bit packet
+	 */
 	protected DatagramPacket packet_24;
+	/**
+	 * UDP socket
+	 */
 	protected DatagramSocket socket;
+	/**
+	 * RoboRIO's address
+	 */
 	protected final SocketAddress address;
+	/**
+	 * My port
+	 */
 	protected final int port;
+	/**
+	 * Buffer backing packets
+	 */
 	protected final ByteBuffer buffer;
-	protected AtomicInteger packetNum = new AtomicInteger(Integer.MIN_VALUE);
+	/**
+	 * Packet number
+	 */
+	protected AtomicInteger packetNum = new AtomicInteger(0);
+	/**
+	 * Create a 
+	 * @throws SocketException
+	 */
 	public RoboRioClient() throws SocketException {
 		this(RIO_PORT, BUFFER_SIZE, new InetSocketAddress(RIO_ADDRESS, RIO_PORT));
 	}

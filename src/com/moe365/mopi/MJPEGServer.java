@@ -24,9 +24,21 @@ import com.divisors.projectcuttlefish.httpserver.util.ByteUtils.ByteBufferTokeni
 import au.edu.jcu.v4l4j.VideoFrame;
 
 public class MJPEGServer implements Runnable {
+	/**
+	 * Main HTTP page (HTML)
+	 */
 	public static final ByteBuffer HTTP_PAGE_MAIN;
+	/**
+	 * 404 page
+	 */
 	public static final ByteBuffer HTTP_PAGE_404;
+	/**
+	 * MJPEG header
+	 */
 	public static final ByteBuffer HTTP_HEAD_MJPEG;
+	/**
+	 * MJPEG frame header
+	 */
 	public static final ByteBuffer HTTP_FRAME_MJPEG;
 	
 	static {
@@ -35,6 +47,11 @@ public class MJPEGServer implements Runnable {
 		HTTP_HEAD_MJPEG = loadHttp("mjpeg-head");
 		HTTP_FRAME_MJPEG = loadHttp("mjpeg-frame-head");
 	}
+	/**
+	 * Load file from the <code>resources</code> package inside the jar.
+	 * @param name name of file
+	 * @return bytebuffer containing 
+	 */
 	protected static ByteBuffer loadHttp(String name) {
 		String tmp;
 		try (BufferedReader br = new BufferedReader(new InputStreamReader(Main.class.getResourceAsStream("/resources/" + name + ".http")))) {
@@ -69,6 +86,11 @@ public class MJPEGServer implements Runnable {
 	protected volatile Set<Long> mjpegChannels = ConcurrentHashMap.newKeySet();
 	protected AtomicBoolean shouldBeRunning = new AtomicBoolean(false);
 
+	/**
+	 * Create server with address
+	 * @param address
+	 * @throws IOException
+	 */
 	public MJPEGServer(SocketAddress address) throws IOException {
 		this.address = address;
 
@@ -79,6 +101,11 @@ public class MJPEGServer implements Runnable {
 		this.serverSocket.register(this.selector, SelectionKey.OP_ACCEPT);
 	}
 
+	/**
+	 * Set ExecutorService for server to spawn thread(s) on.
+	 * @param executor service to run on
+	 * @return self
+	 */
 	public MJPEGServer runOn(ExecutorService executor) {
 		this.executor = executor;
 		return this;

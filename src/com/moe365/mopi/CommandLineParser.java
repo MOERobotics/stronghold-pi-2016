@@ -35,6 +35,10 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		this.options = new HashMap<>(builder.options);
 	}
 
+	/**
+	 * Build a help string with all the aliases and stuff
+	 * @return a help string, printable 
+	 */
 	public String getHelpString() {
 		StringBuilder result = new StringBuilder();
 		//add usage
@@ -182,8 +186,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 	}
 	
 	/**
-	 * @author hi_
-	 *
+	 * @author mailmindlin
 	 */
 	public enum CommandLineTokenType {
 		ALIAS,
@@ -212,6 +215,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		}
 		
 		public CommandLineAlias(String name, String target) {
+			this.name = name;
 			this.targetName = target;
 		}
 		

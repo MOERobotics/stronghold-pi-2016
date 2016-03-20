@@ -59,67 +59,110 @@ Content-Type: text/html\r\n
 			var img = $_('img');
 			var ctx = cvs.getContext('2d');
 			ctx.lineWidth=2;
-			ctx.strokeStyle='#F00';
+			ctx.strokeStyle='#0F0';
+			var selected = 0;
 			var locked = true;
-			var overlay = {x:.5,y:.5};
+			var overlays = [{x:.5,y:.5},{x:.5,y:.5}];
 			if ('overlay' in localStorage)
-				overlay = JSON.parse(localStorage['overlay']);
-			overlay.x *= cvs.width;
-			overlay.y *= cvs.height;
-			function updateOverlay() {
-				ctx.clearRect(0,0,cvs.width, cvs.height);
-				ctx.beginPath();
-				ctx.moveTo(overlay.x, 0);
-				ctx.lineTo(overlay.x, cvs.height);
-				ctx.stroke();
-				ctx.beginPath();
-				ctx.moveTo(0, overlay.y);
-				ctx.lineTo(cvs.width, overlay.y);
-				ctx.stroke();
-				console.info('Drawing overlay',{x:overlay.x,y:overlay.y,px:overlay.x/cvs.width,py:overlay.y/cvs.height});
+				overlays = [JSON.parse(localStorage['overlay']),{x:.5,y:.5}];/*backwards compat.*/
+			if ('overlays' in localStorage)
+				overlays = JSON.parse(localStorage['overlays']);
+			for (let overlay of overlays) {
+				overlay.x *= cvs.width;
+				overlay.y *= cvs.height;
 			}
-			updateOverlay();
+			function updateOverlays() {
+				var w = cvs.width * .05;
+				var h = cvs.height * .1;
+				console.groupCollapsed('Drawing overlays');
+				ctx.clearRect(0,0,cvs.width, cvs.height);
+				for (var i in overlays) {
+					ctx.strokeStyle = (i==selected && !locked) ? '#0F0' : '#F00';
+					var x = overlays[i].x;
+					var y = overlays[i].y;
+					ctx.beginPath();
+					ctx.moveTo(x, y - h);
+					ctx.lineTo(x, y + h);
+					ctx.stroke();
+					ctx.beginPath();
+					ctx.moveTo(x - w, y);
+					ctx.lineTo(x + w, y);
+					ctx.stroke();
+					console.info({x:x,y:y,px:overlays[i].x/cvs.width,py:overlays[i].y/cvs.height});
+				}
+				console.groupEnd();
+			}
+			updateOverlays();
 			function reset() {
 				if (locked) {
-					console.error("Overlay is locked. Press 'l' to unlock.");
+					console.error("Overlays are locked. Press 'L' to unlock.");
 					return;
 				}
-				overlay = {x: cvs.width/2, y: cvs.height/2};
-				localStorage['overlay'] = JSON.stringify({x:.5,y:.5});
+				var x = cvs.width/2;
+				var y = cvs.height/2;
+				var tmp = [];
+				for (let overlay of overlays) {
+					overlay.x = x;
+					overlay.y = y;
+					tmp.push({x:.5,y:.5});
+				}
+				localStorage['overlays'] = JSON.stringify(tmp);
 				updateOverlay();
 			}
 			function move(dx, dy) {
 				if (locked) {
-					console.error("Overlay is locked. Press 'l' to unlock.");
+					console.error("Overlays are locked. Press 'L' to unlock.");
 					return;
 				}
-				console.log('moving overlay',{dx:dx,dy:dy});
-				overlay.x+= dx;
-				overlay.y+= dy;
-				localStorage['overlay'] = JSON.stringify({x:overlay.x/cvs.width,y:overlay.y/cvs.height});
-				updateOverlay();
+				console.log('moving overlay ' + selected,{dx:dx,dy:dy});
+				var overlay = overlays[selected];
+				overlay.x += dx;
+				overlay.y += dy;
+				var tmp;
+				if ('overlays' in localStorage && (tmp = JSON.parse(localStorage['overlays'])).length == overlays.length) {
+					tmp[selected] = {x:overlay.x/cvs.width,y:overlay.y/cvs.height};
+				} else {
+					tmp = [];
+					for (var overlay of overlays)
+						tmp.push({x:overlay.x/cvs.width,y:overlay.y/cvs.height});
+				}
+				localStorage['overlays'] = JSON.stringify(tmp);
+				updateOverlays();
 			}
 			document.addEventListener('keydown',function(e) {
 				var dx = 0, dy = 0;
 				console.log('keydown',{key:e.key, code:e.code});
-				if (e.code == 'ArrowDown') {
+				if (e.code == 'ArrowDown' || e.code == 'KeyS') {
 					dy++;
-				} else if (e.code == 'ArrowUp') {
+				} else if (e.code == 'ArrowUp' || e.code == 'KeyW') {
 					dy--;
-				} else if (e.code == 'ArrowLeft') {
+				} else if (e.code == 'ArrowLeft' || e.code == 'KeyA') {
 					dx--;
-				} else if (e.code == 'ArrowRight') {
+				} else if (e.code == 'ArrowRight' || e.code == 'KeyD') {
 					dx++;
 				} else if (e.code == 'KeyR') {
 					return reset();
 				} else if (e.code == 'KeyL') {
 					locked = !locked;
-					console.warn('Overlay is ' + (locked ? '' : 'not ') + 'locked.');
+					console.warn('Overlays are ' + (locked ? '' : 'not ') + 'locked.');
 					$_('.lock-label').classList.remove('locked','unlocked');
 					$_('.lock-label').classList.add(locked ? 'locked' : 'unlocked');
+					updateOverlays();
 					return;
+				} else if (e.code == 'Tab') {
+					e.preventDefault();
+					if (locked) {
+						console.error("Overlays are locked. Press 'L' to unlock.");
+						return;
+					}
+					selected += e.shiftKey ? -1 : 1;
+					if (selected < 0)
+						selected = overlays.length - 1;
+					if (selected > overlays.length - 1)
+						selected = 0;
+					updateOverlays();
 				} else {
-					console.error('Unknown key pressed', e);
+					console.warn('Unknown key pressed', e);
 					return;
 				}
 				if (!e.shiftKey) {
@@ -136,3 +179,4 @@ Content-Type: text/html\r\n
 		</script>
 	</body>
 </html>
+

@@ -60,7 +60,9 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 					result.append("  ").append(alias).append('\n');
 				result.append("  ").append(entry.getKey()).append('\n');
 			}
-			result.append(token.getDescription().replace("\n", "\n    ")).append('\n');
+			result.append("    ")
+				.append(token.getDescription().replace("\n", "\n    "))
+				.append('\n');
 		}
 		
 		return result.toString();
@@ -71,6 +73,12 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		HashMap<String, String> data = new HashMap<>();
 		for (int i = 0; i < args.length; i++) {
 			CommandLineToken token = this.options.get(args[i]);
+			if (token == null) {
+				System.err.println("Unknown token: " + args[i]);
+				data.putIfAbsent(args[i], "");
+				continue;
+			}
+			
 			while (token.getType() == CommandLineTokenType.ALIAS)//TODO fix infinite loops
 				token = options.get(((CommandLineAlias)token).getTarget());
 			
@@ -111,6 +119,24 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		public String get(String name) {
 			return data.get(name);
 		}
+		public String getOrDefault(String name, String def) {
+			if (isFlagSet(name))
+				return name;
+			return def;
+		}
+		public int getOrDefault(String name, int def) {
+			if (isFlagSet(name)) {
+				try {
+					return Integer.parseInt(get(name));
+				} catch (Exception e){}
+			}
+			return def;
+		}
+		public ParsedCommandLineArguments add(ParsedCommandLineArguments t) {
+			this.data.putAll(t.data);
+			return this;
+		}
+		
 	}
 	/**
 	 * Builder for CommandLineParser's

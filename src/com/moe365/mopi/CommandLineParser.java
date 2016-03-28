@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
 
@@ -44,7 +45,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		//add usage
 		result.append("Usage: ").append(usage).append('\n');
 		
-		for (Map.Entry<String, CommandLineToken> entry : this.options.entrySet()) {
+		for (Map.Entry<String, CommandLineToken> entry : this.options.entrySet().parallelStream().sorted((a,b)->(a.getKey().compareTo(b.getKey()))).collect(Collectors.toList())) {
 			CommandLineToken token = entry.getValue();
 			if (token == null) {
 				System.err.println("Null under " + entry.getKey());

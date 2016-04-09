@@ -20,6 +20,8 @@ import com.pi4j.io.gpio.PinState;
 import com.pi4j.io.gpio.RaspiPin;
 
 import au.edu.jcu.v4l4j.CaptureCallback;
+import au.edu.jcu.v4l4j.Control;
+import au.edu.jcu.v4l4j.ControlList;
 import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
@@ -52,7 +54,8 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  * @author mailmindlin
  */
 public class Main {
-	public static final String version = "0.0.0-alpha";
+	public static final int DEFAULT_PORT = 5800;
+	public static final String version = "0.1.0-alpha";
 	public static int width;
 	public static int height;
 	public static void main(String...fred) throws IOException, V4L4JException {
@@ -65,7 +68,9 @@ public class Main {
 		}
 		
 		if (parsed.isFlagSet("--rebuild-parser")) {
+			System.out.print("Building parser...\t");
 			buildParser();
+			System.out.println("Done.");
 			return;
 		}
 		
@@ -79,7 +84,8 @@ public class Main {
 		
 		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
 		
-		final ImageProcessor tracer = parsed.isFlagSet("--no-process") ? null : new ImageProcessor(width, height);//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
+		final ImageProcessor tracer = initProcessor(parsed);
+		
 		final AtomicBoolean ledState = new AtomicBoolean(false);
 		
 		if (parsed.isFlagSet("--test")) {
@@ -88,37 +94,59 @@ public class Main {
 				case "converter":
 					testConverter(device);
 					return;
+				case "controls":
+					testControls(device);
+					return;
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
 		}
 		
-		JPEGFrameGrabber fg = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, parsed.getOrDefault("--jpeg-quality", 80));
+		final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
+		System.out.println("JPEG quality: " + jpegQuality + "%");
+		JPEGFrameGrabber fg = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality);
 		fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
 		System.out.println("Framerate: " + fg.getFrameInterval());
+		
 		fg.setCaptureCallback(new CaptureCallback() {
 			@Override
 			public void nextFrame(VideoFrame frame) {
-				if (server != null)
-					server.onNextFrame(frame);
-				if (tracer != null) {
-					tracer.update(frame, ledState.get());
+				try {
+					if (server != null && ledState.get())
+						server.onNextFrame(frame);
+					if (tracer != null) {
+						tracer.update(frame, ledState.get());
+					} else {
+						frame.recycle();
+					}
 					System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
-				gpioPin.setState(ledState.get());
-				ledState.set(!ledState.get());
-				} else {
-					frame.recycle();
+					gpioPin.setState(!ledState.get());
+					ledState.set(!ledState.get());
+				} catch (Exception e) {
+					e.printStackTrace();
+					throw e;
 				}
-//				tracer.run();
 			}
 
 			@Override
 			public void exceptionReceived(V4L4JException e) {
 				e.printStackTrace();
 				fg.stopCapture();
+				if (server != null)
+					try {
+						server.shutdown();
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					}
 			}
 		});
 		fg.startCapture();
+	}
+	protected static void testControls(VideoDevice device) {
+		ControlList controls = device.getControlList();
+		for (Control control : controls.getList()) {
+//			System.out.print();
+		}
 	}
 	/**
 	 * Initialize the GPIO, getting the pin that the LED is attached to.
@@ -138,32 +166,56 @@ public class Main {
 		pin.setState(false);
 		return pin;
 	}
+	protected static ImageProcessor initProcessor(ParsedCommandLineArguments args) {
+		if (args.isFlagSet("--no-process")) {
+			System.out.println("PROCESSOR DISABLED");
+			return null;
+		} else {
+			return new ImageProcessor(width, height).start();
+			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
+		}
+	}
+	/**
+	 * Create and initialize the server
+	 * @param args the command line arguments
+	 * @return server, if created, or null
+	 * @throws IOException
+	 */
 	protected static MJPEGServer initServer(ParsedCommandLineArguments args) throws IOException {
-		int port = args.getOrDefault("--port", 5800);
+		int port = args.getOrDefault("--port", DEFAULT_PORT);
 		
 		if (port > 0 && !args.isFlagSet("--no-server")) {
 			MJPEGServer server = new MJPEGServer(new InetSocketAddress(port));
 			server.runOn(Executors.newCachedThreadPool());
 			server.start();
 			return server;
+		} else {
+			System.out.println("SERVER DISABLED");
 		}
 		return null;
 	}
 	protected static void testConverter(VideoDevice dev) {
 		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
-		
 	}
 	protected static VideoDevice initCamera(ParsedCommandLineArguments args) throws V4L4JException {
 		String devName = args.getOrDefault("--camera", "/dev/video0");
 		
-		VideoDevice device = new VideoDevice(devName);
-		System.out.println("Connected to camera @ " + device.getDevicefile());
+		System.out.print("Attempting to connect to camera @ " + devName + "...\t");
+		VideoDevice device;
+		try {
+			device = new VideoDevice(devName);
+		} catch (V4L4JException e) {
+			System.out.println("ERROR");
+			throw e;
+		}
+		System.out.println("SUCCESS");
 		return device;
 	}
 	protected static CommandLineParser loadParser() {
 		try (ObjectInput in = new ObjectInputStream(Main.class.getResourceAsStream("/resources/parser.ser"))) {
 			return (CommandLineParser) in.readObject();
 		} catch (IOException | ClassNotFoundException e) {
+			System.err.println("Error reading parser");
 			e.printStackTrace();
 		}
 		return buildParser();

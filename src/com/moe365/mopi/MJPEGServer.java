@@ -175,6 +175,8 @@ public class MJPEGServer implements Runnable {
 			return;
 		System.out.print('W');
 		System.out.print(this.mjpegChannels.size());
+//		System.out.print('/');
+//		System.out.print(Math.round(writeBuffer.limit()/102.4)/10.0);
 		try {
 			for (Long id : this.mjpegChannels) {
 				SocketChannel channel = this.channelMap.get(id);
@@ -183,9 +185,7 @@ public class MJPEGServer implements Runnable {
 					continue;
 				}
 				try {
-					HTTP_FRAME_MJPEG.rewind();
-					writeBuffer.rewind();
-					if (channel.write(HTTP_FRAME_MJPEG) < 0 || channel.write(writeBuffer) < 0)
+					if (channel.write(HTTP_FRAME_MJPEG.duplicate()) < 0 || channel.write(writeBuffer) < 0)
 						this.mjpegChannels.remove(id);
 				} catch (IOException e) {
 					e.printStackTrace();

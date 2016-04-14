@@ -17,6 +17,7 @@ import au.edu.jcu.v4l4j.VideoFrame;
 public class ImageProcessor implements Runnable {
 	public static final int step = 1, tolerance = 70;
 	AtomicBoolean imageLock = new AtomicBoolean(false);
+	protected final RoboRioClient client;
 	/**
 	 * A frame where the flash is off
 	 */
@@ -30,9 +31,10 @@ public class ImageProcessor implements Runnable {
 	BufferedImage img;
 	AtomicInteger i = new AtomicInteger(0);
 	Thread thread;
-	public ImageProcessor(int width, int height) {
+	public ImageProcessor(int width, int height, RoboRioClient client) {
 		this.width = width;
 		this.height = height;
+		this.client = client;
 		
 		this.onRed = new short[height][width];
 		this.onGreen = new short[height][width];
@@ -197,7 +199,9 @@ public class ImageProcessor implements Runnable {
 			System.out.println("=>X: " + x + "; Y: " + y + "; W: " + rw + "; H:" + rh);
 		}
 		try {
+			if (client != null) {
 				if (rectangles.isEmpty()) {
+					client.writeNoneFound();
 				} else {
 					Rectangle rect0 = rectangles.get(0);
 					double x0 = rect0.getX() / ((double) width);
@@ -205,12 +209,15 @@ public class ImageProcessor implements Runnable {
 					double w0 = rect0.getWidth() / ((double) width);
 					double h0 = rect0.getHeight() / ((double) height);
 					if (rectangles.size() == 1) {
+						client.writeOneFound(x0, y0, w0, h0);
 					} else {
 						Rectangle rect1 = rectangles.get(1);
 						double x1 = rect1.getX() / ((double) width);
 						double y1 = rect1.getY() / ((double) height);
 						double w1 = rect1.getWidth() / ((double) width);
 						double h1 = rect1.getHeight() / ((double) height);
+						client.writeTwoFound(x0, y0, w0, h0, x1, h1, w1, h1);
+					}
 				}
 			}
 		} catch (IOException | NullPointerException e) {

@@ -55,7 +55,7 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.1.1-alpha";
+	public static final String version = "0.1.2-alpha";
 	public static int width;
 	public static int height;
 	public static void main(String...fred) throws IOException, V4L4JException {

@@ -1,7 +1,11 @@
 package com.moe365.mopi;
 
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -11,7 +15,7 @@ import javax.imageio.ImageIO;
 import au.edu.jcu.v4l4j.VideoFrame;
 
 public class ImageProcessor implements Runnable {
-	public static final int step = 6, tolerance = 70;
+	public static final int step = 1, tolerance = 70;
 	AtomicBoolean imageLock = new AtomicBoolean(false);
 	/**
 	 * A frame where the flash is off
@@ -117,7 +121,12 @@ public class ImageProcessor implements Runnable {
 	}
 	@SuppressWarnings("unused")
 	public void calcDeltaAdv(BufferedImage img) {
+		// Whether the value of any cell in result[][] is valid (has been
+		// calculated yet)
 		boolean[][] processed = new boolean[height][width];
+		// boolean array of the results. A cell @ result[y][x] is only
+		// valid if processed[y][x] is true.
+		boolean[][] result = new boolean[height][width];
 		System.out.println("Calculating...");
 		img.flush();
 		if (this.frameOff.get() == null || this.frameOn.get() == null)
@@ -133,14 +142,29 @@ public class ImageProcessor implements Runnable {
 				int px = 0;
 				split(on.getRGB(x, y), pxOn);
 				split(off.getRGB(x, y), pxOff);
-				if (pxOn[0] - pxOff[0] > tolerance)
-					px |= 0xFF0000;
-				if (pxOn[1] - pxOff[1] > tolerance)
-					px |= 0xFF00;
-				if (pxOn[2] - pxOff[2] > tolerance)
-					px |= 0xFF;
-				img.setRGB(x, y, px);
-				if (false && pxOn[1] - pxOff[1] > 50) {
+				int dR = pxOn[0] - pxOff[0];
+				int dG =  pxOn[1] - pxOff[1];
+				int dB =  pxOn[2] - pxOff[2];
+				if (dR < tolerance && dG > tolerance)
+					px = (Math.min(dR, 0xFF) << 16) | (Math.min(dG, 0xFF) << 8) | (Math.min(dB, 0xFF));
+				/*if (dG > tolerance) {
+					for (int i = y - step/2; i < y + step/2; i++) {
+						for (int j = x - step/2; j < x + step/2; x++) {
+							int rA = on.getRGB(j, i);
+							int rB = on.getRGB(j, i);
+							img.setRGB(j, i, (((rA >> 16) & 0xFF) - ((rB >> 16) & 0xFF)<<16));
+						}
+					}
+				}*/
+//				px = ((Math.max(pxOn[0] - pxOff[0], 0) & 0xFF) << 16) | ((Math.max(pxOn[1] - pxOff[1], 0) & 0xFF) << 8) | (Math.max(pxOn[2] - pxOff[2], 0) & 0xFF);
+//				if (dR > tolerance)
+//					px |= 0xFF0000;
+				if (dG > tolerance)
+					result[y][x] = true;
+//				if (dB > tolerance)
+//					px |= 0xFF;
+//				img.setRGB(x, y, px);
+				/*if (pxOn[1] - pxOff[1] > 50) {
 					for (int y1 = Math.max(0, y-15); y1 < Math.min(height, y + 15); y1++) {
 						for (int x1 = Math.max(0, x-15); x1 < Math.min(width, x + 15); x1++) {
 							if (processed[y1][x1])

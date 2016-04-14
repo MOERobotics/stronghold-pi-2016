@@ -13,69 +13,40 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * UDP server to broadcast data at the RIO.
  * <p>
- * All packets start with a 32 bit unsigned integer sequence number,
- * which will always increase between consecutive packets. Format of
- * the UDP packets:
+ * All packets sent from this class start with a 32 bit unsigned integer
+ * sequence number, which will always increase between consecutive packets.
+ * Format of the UDP packets:
+ * 
  * <pre>
  *  0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |                          Sequence Number                      |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |           Status code         |                ACK            |
+ * |           Status code         |               ACK             |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * </pre>
  * <dl>
  * <dt>Sequence Number: 32 bits</dt>
- * <dd>The packet number, always increasing. If packet A is received with
- * 	a sequence number of 5, then all future packets with sequence numbers under
- * 	5 may be discarded. This may be a timestamp</dd>
+ * <dd>The packet number, always increasing. If packet A is received with a
+ * sequence number of 5, then all future packets with sequence numbers under 5
+ * may be discarded. This may be a timestamp</dd>
  * <dt>Status code: 16 bits</dt>
  * <dd>One of the following:
- * <ol start=0>
- * <li>NOP</li>
- * <li>HELLO_WORLD</li>
- * <li>ERROR</li>
- * <li>NONE_FOUND</li>
- * <li>ONE_FOUMD</li>
- * <li>TWO_FOUND</li>
- * <li>GOODBYE</li>
- * </ol>
- * All other status codes are reserved for future use.
- * </dd>
- * <dt>Flag: 8 bits</dt>
- * <dd>Like a secondary status code, it is used for
- * 		stuff like QOS. If unused, set to 0.
- * 	<table>
- * 		<thead>
- * 			<tr>
- * 				<th>#</th>
- * 				<th>Name</th>
- * 				<th>Description</th>
- * 			</tr>
- *		</thead>
- *		<tbody>
- *			<tr>
- *				<td>0</td>
- *				<td>Ping</td>
- *				<td>Sends a ping request. For latency measurement</td>
- *			</tr>
- *			<tr>
- *				<td>1</td>
- * 			<li>PING</li>
- * 			<li>PONG</li>
- * 			<li>ARE_YOU_STILL_THERE</li>
- * 			<li>YES_I_AM</li>
- * 		</tbpdy>
- * 	</table>
- * </dd>
- * </dl>
+ * <ol start=0> <li>NOP</li> <li>NONE_FOUND</li> <li>ONE_FOUMD</li>
+ * <li>TWO_FOUND</li> <li>GOODBYE</li> </ol> All other status codes are reserved
+ * for future use. </dd> <dt>Flag: 8 bits</dt> <dd>Like a secondary status code,
+ * it is used for stuff like QOS. If unused, set to 0. <table> <thead> <tr>
+ * <th>#</th> <th>Name</th> <th>Description</th> </tr> </thead> <tbody> <tr>
+ * <td>0</td> <td>Ping</td> <td>Sends a ping request. For latency
+ * measurement</td> </tr> <tr> <td>1</td> <li>PING</li> <li>PONG</li>
+ * <li>ARE_YOU_STILL_THERE</li> <li>YES_I_AM</li> </tbpdy> </table> </dd> </dl>
  * </p>
- * 			
+ * 
  * @author mailmindlin
  */
 public class RoboRioClient implements Closeable, Runnable {
 	public static final int RIO_PORT = 5801;
-	public static final int BUFFER_SIZE = 24;
+	public static final int BUFFER_SIZE = 72;
 	public static final String RIO_ADDRESS = "roboRIO-365-FRC.local";
 	
 	public static final short STATUS_NOP = 0;
@@ -99,11 +70,11 @@ public class RoboRioClient implements Closeable, Runnable {
 	/**
 	 * 16 bit packet
 	 */
-	protected DatagramPacket packet_16;
+	protected DatagramPacket packet_40;
 	/**
 	 * 24 bit packet
 	 */
-	protected DatagramPacket packet_24;
+	protected DatagramPacket packet_72;
 	/**
 	 * UDP socket
 	 */
@@ -131,15 +102,19 @@ public class RoboRioClient implements Closeable, Runnable {
 	public RoboRioClient() throws SocketException {
 		this(RIO_PORT, BUFFER_SIZE, new InetSocketAddress(RIO_ADDRESS, RIO_PORT));
 	}
+	public RoboRioClient(int port, SocketAddress addr) throws SocketException {
+		this(port, BUFFER_SIZE, addr);
+	}
 	public RoboRioClient(int port, int buffSize, SocketAddress addr) throws SocketException {
 		this.port = port;
 		this.address = addr;
 		this.buffer = ByteBuffer.allocate(buffSize);
+		System.out.println("Connecting to RIO: " + port + " | " + addr);
 		this.socket = new DatagramSocket(port);
 		socket.setTrafficClass(0x10);//Low delay
 		this.packet_8 = new DatagramPacket(buffer.array(), 0, 8, address);
-		this.packet_16 = new DatagramPacket(buffer.array(), 0, 16, address);
-		this.packet_24 = new DatagramPacket(buffer.array(), 0, 24, address);
+		this.packet_40 = new DatagramPacket(buffer.array(), 0, 40, address);
+		this.packet_72 = new DatagramPacket(buffer.array(), 0, 72, address);
 	}
 	public void build(short status, short ack) {
 		buffer.position(0);
@@ -158,21 +133,30 @@ public class RoboRioClient implements Closeable, Runnable {
 	public void writeNoneFound() throws IOException {
 		write(STATUS_NONE_FOUND);
 	}
-	public void writeOneFound(double pos) throws IOException {
+	public void writeOneFound(double left, double top, double width, double height) throws IOException {
 		build(STATUS_ONE_FOUND, (short) 0);
-		buffer.putDouble(pos);
-		socket.send(packet_16);
+		buffer.putDouble(top);
+		buffer.putDouble(left);
+		buffer.putDouble(width);
+		buffer.putDouble(height);
+		socket.send(packet_40);
 	}
-	public void writeTwoFound(double pos1, double pos2) throws IOException {
+	public void writeTwoFound(double left1, double top1, double width1, double height1, double left2, double top2, double width2, double height2) throws IOException {
 		build(STATUS_TWO_FOUND, (short) 0);
-		buffer.putDouble(pos1);
-		buffer.putDouble(pos2);
-		socket.send(packet_24);
+		buffer.putDouble(left1);
+		buffer.putDouble(top1);
+		buffer.putDouble(width1);
+		buffer.putDouble(height1);
+		buffer.putDouble(left2);
+		buffer.putDouble(top2);
+		buffer.putDouble(width2);
+		buffer.putDouble(height2);
+		socket.send(packet_72);
 	}
 	public void writeError(long errorCode) throws IOException {
 		build(STATUS_ERROR, (short)0);
 		buffer.putLong(errorCode);
-		socket.send(packet_16);
+		socket.send(packet_8);
 	}
 	@Override
 	public void close() throws IOException {

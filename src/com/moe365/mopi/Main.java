@@ -8,6 +8,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -28,6 +30,9 @@ import au.edu.jcu.v4l4j.V4L4JConstants;
 import au.edu.jcu.v4l4j.VideoDevice;
 import au.edu.jcu.v4l4j.VideoFrame;
 import au.edu.jcu.v4l4j.encoder.JPEGEncoder;
+import au.edu.jcu.v4l4j.exceptions.ControlException;
+import au.edu.jcu.v4l4j.exceptions.StateException;
+import au.edu.jcu.v4l4j.exceptions.UnsupportedMethod;
 import au.edu.jcu.v4l4j.exceptions.V4L4JException;
 
 /**
@@ -55,10 +60,10 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.1.2-alpha";
+	public static final String version = "0.1.3-alpha";
 	public static int width;
 	public static int height;
-	public static void main(String...fred) throws IOException, V4L4JException {
+	public static void main(String...fred) throws IOException, V4L4JException, InterruptedException {
 		CommandLineParser parser = loadParser();
 		ParsedCommandLineArguments parsed = parser.apply(fred);
 		
@@ -84,7 +89,9 @@ public class Main {
 		
 		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
 		
-		final ImageProcessor tracer = initProcessor(parsed);
+		final RoboRioClient client = initClient(parsed);
+		
+		final ImageProcessor tracer = initProcessor(parsed, client);
 		
 		final AtomicBoolean ledState = new AtomicBoolean(false);
 		
@@ -96,6 +103,9 @@ public class Main {
 					break;
 				case "controls":
 					testControls(device);
+					break;
+				case "client":
+					testClient(client);
 					break;
 				default:
 					System.err.println("Unknown test '" + target + "'");
@@ -143,6 +153,21 @@ public class Main {
 			}
 		});
 		fg.startCapture();
+	}
+	protected static void testClient(RoboRioClient client) throws IOException, InterruptedException {
+		System.out.println("RUNNING TEST: CLIENT");
+		//just spews out UDP packets on a 3s loop
+		while (true) {
+			System.out.println("Writing r0");
+			client.writeNoneFound();
+			Thread.sleep(1000);
+			System.out.println("Wrinting r1");
+			client.writeOneFound(1.0, 2.0, 3.0, 4.0);
+			Thread.sleep(1000);
+			System.out.println("Writing r2");
+			client.writeTwoFound(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.2);
+			Thread.sleep(1000);
+		}
 	}
 	protected static void testControls(VideoDevice device) throws ControlException, UnsupportedMethod, StateException {
 		System.out.println("RUNNING TEST: CONTROLS");
@@ -217,7 +242,16 @@ public class Main {
 		pin.setState(false);
 		return pin;
 	}
-	protected static ImageProcessor initProcessor(ParsedCommandLineArguments args) {
+	protected static RoboRioClient initClient(ParsedCommandLineArguments args) throws SocketException {
+		int port = args.getOrDefault("--rio-port", RoboRioClient.RIO_PORT);
+		if (port < 0)
+			return null;
+		String address = args.getOrDefault("--rio-addr", RoboRioClient.RIO_ADDRESS);
+		System.out.println("Address: " + address);
+		InetSocketAddress addr = new InetSocketAddress(address, port);
+		return new RoboRioClient(port, addr);
+	}
+	protected static ImageProcessor initProcessor(ParsedCommandLineArguments args, RoboRioClient client) {
 		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
 			return null;

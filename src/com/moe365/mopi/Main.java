@@ -93,13 +93,15 @@ public class Main {
 			switch (target) {
 				case "converter":
 					testConverter(device);
-					return;
+					break;
 				case "controls":
 					testControls(device);
-					return;
+					break;
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
+			device.release();
+			System.exit(0);
 		}
 		
 		final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
@@ -142,11 +144,58 @@ public class Main {
 		});
 		fg.startCapture();
 	}
-	protected static void testControls(VideoDevice device) {
+	protected static void testControls(VideoDevice device) throws ControlException, UnsupportedMethod, StateException {
+		System.out.println("RUNNING TEST: CONTROLS");
 		ControlList controls = device.getControlList();
 		for (Control control : controls.getList()) {
-//			System.out.print();
+			switch (control.getType()) {
+				case V4L4JConstants.CTRL_TYPE_STRING:
+					System.out.print("String control: " + control.getName() + " - min: " + control.getMinValue() + " - max: "
+							+ control.getMaxValue() + " - step: " + control.getStepValue() + " - value: ");
+					try {
+						System.out.println(control.getStringValue());
+					} catch (V4L4JException ve) {
+						System.out.println(" ERROR");
+						ve.printStackTrace();
+					}
+					break;
+				case V4L4JConstants.CTRL_TYPE_LONG:
+					System.out.print("Long control: " + control.getName() + " - value: ");
+					try {
+						System.out.println(control.getLongValue());
+					} catch (V4L4JException ve) {
+						System.out.println(" ERROR");
+					}
+					break;
+				case V4L4JConstants.CTRL_TYPE_DISCRETE:
+					Map<String, Integer> valueMap = control.getDiscreteValuesMap();
+					System.out.print("Menu control: " + control.getName() + " - value: ");
+					try {
+						int value = control.getValue();
+						System.out.print(value);
+						try {
+							System.out.println(" (" + control.getDiscreteValueName(control.getDiscreteValues().indexOf(value)) + ")");
+						} catch (Exception e) {
+							System.out.println(" (unknown)");
+						}
+					} catch (V4L4JException ve) {
+						System.out.println(" ERROR");
+					}
+					System.out.println("\tMenu entries:");
+					for (String s : valueMap.keySet())
+						System.out.println("\t\t" + valueMap.get(s) + " - " + s);
+					break;
+				default:
+					System.out.print("Control: " + control.getName() + " - min: " + control.getMinValue() + " - max: " + control.getMaxValue()
+							+ " - step: " + control.getStepValue() + " - value: ");
+					try {
+						System.out.println(control.getValue());
+					} catch (V4L4JException ve) {
+						System.out.println(" ERROR");
+					}
+			}
 		}
+		device.releaseControlList();
 	}
 	/**
 	 * Initialize the GPIO, getting the pin that the LED is attached to.

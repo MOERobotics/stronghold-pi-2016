@@ -119,7 +119,7 @@ public class Main {
 					} else {
 						frame.recycle();
 					}
-					System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
+//					System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
 					gpioPin.setState(!ledState.get());
 					ledState.set(!ledState.get());
 				} catch (Exception e) {
@@ -154,6 +154,8 @@ public class Main {
 	 * @return LED pin
 	 */
 	protected static GpioPinDigitalOutput initGpio(ParsedCommandLineArguments args) {
+		if (args.isFlagSet("--no-gpio"))
+			return null;
 		final GpioController gpio = GpioFactory.getInstance();
 		GpioPinDigitalOutput pin;
 		if (args.isFlagSet("--gpio-pin")) {
@@ -171,7 +173,7 @@ public class Main {
 			System.out.println("PROCESSOR DISABLED");
 			return null;
 		} else {
-			return new ImageProcessor(width, height).start();
+			return new ImageProcessor(width, height, client).start();
 			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
 		}
 	}
@@ -199,7 +201,8 @@ public class Main {
 	}
 	protected static VideoDevice initCamera(ParsedCommandLineArguments args) throws V4L4JException {
 		String devName = args.getOrDefault("--camera", "/dev/video0");
-		
+		if (args.isFlagSet("--no-camera"))
+			return null;
 		System.out.print("Attempting to connect to camera @ " + devName + "...\t");
 		VideoDevice device;
 		try {
@@ -235,6 +238,7 @@ public class Main {
 			.addFlag("--no-server", "Disables server")
 			.addFlag("--version", "Print version string")
 			.addKvPair("--rio-addr", "address", "Specify where to find the RoboRio")
+			.addKvPair("--rio-port", "port", "Specify the port to use on the RoboRio")
 			.addKvPair("--props", "file", "Specify the file to read properties from")
 			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future")
 			.addFlag("--rebuild-parser", "Rebuilds the parser object")
@@ -247,6 +251,8 @@ public class Main {
 			.addKvPair("--fps-num", "numerator", "Set FPS numerator")
 			.addKvPair("--fps-denom", "denom", "Set FPS denominator")
 			.addFlag("--no-process", "Disable image processing")
+			.addFlag("--no-camera", "Do not specify a camera")
+			.addFlag("--no-gpio", "Do not specify a gpio pin")
 			.addKvPair("--jpeg-quality", "quality", "Set the JPEG quality to request")
 			.build();
 		File outputFile = new File("src/resources/parser.ser");

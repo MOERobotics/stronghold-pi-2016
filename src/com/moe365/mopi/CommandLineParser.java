@@ -126,7 +126,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		}
 		public String getOrDefault(String name, String def) {
 			if (isFlagSet(name))
-				return name;
+				return get(name);
 			return def;
 		}
 		public int getOrDefault(String name, int def) {

@@ -33,19 +33,24 @@ public class MJPEGServer implements Runnable {
 	 */
 	public static final ByteBuffer HTTP_PAGE_404;
 	/**
-	 * MJPEG header
+	 * MJPEG header (sent at the top of the response)
 	 */
 	public static final ByteBuffer HTTP_HEAD_MJPEG;
 	/**
-	 * MJPEG frame header
+	 * MJPEG frame header (sent before each frame)
 	 */
 	public static final ByteBuffer HTTP_FRAME_MJPEG;
+	/**
+	 * A generic 200 OK response
+	 */
+	public static final ByteBuffer HTTP_PAGE_200;
 	
 	static {
 		HTTP_PAGE_MAIN = loadHttp("main");
 		HTTP_PAGE_404 = loadHttp("404");
 		HTTP_HEAD_MJPEG = loadHttp("mjpeg-head");
 		HTTP_FRAME_MJPEG = loadHttp("mjpeg-frame-head");
+		HTTP_PAGE_200 = loadHttp("200");
 	}
 	/**
 	 * Load file from the <code>resources</code> package inside the jar.
@@ -79,8 +84,8 @@ public class MJPEGServer implements Runnable {
 	/**
 	 * Buffer for queuing frames to be written in
 	 */
-	protected ByteBuffer writeBuffer = ByteBuffer.allocateDirect(1024 * 100);
-	protected AtomicBoolean isWriteBufferLocked = new AtomicBoolean(false);
+	protected ByteBuffer jpegWriteBuffer = ByteBuffer.allocateDirect(1024 * 100);
+	protected AtomicBoolean isJpegBufferLocked = new AtomicBoolean(false);
 	protected AtomicBoolean isImageAvailable = new AtomicBoolean(false);
 	protected ConcurrentHashMap<Long, SocketChannel> channelMap = new ConcurrentHashMap<>();
 	protected volatile Set<Long> mjpegChannels = ConcurrentHashMap.newKeySet();
@@ -153,25 +158,26 @@ public class MJPEGServer implements Runnable {
 	}
 	
 	public void onNextFrame(VideoFrame frame) {
-		if (isImageAvailable.get() || (!isWriteBufferLocked.compareAndSet(false, true))) {
+		if (isImageAvailable.get() || (!isJpegBufferLocked.compareAndSet(false, true))) {
 			System.err.print('D');
 			return;
 		}
 		try {
-			writeBuffer.clear();
-			writeBuffer.put(Integer.toString(frame.getFrameLength()).getBytes());
-			writeBuffer.put(new byte[]{'\r','\n','\r','\n'});
-			writeBuffer.put(frame.getBytes(), 0, frame.getFrameLength());
-			writeBuffer.flip();
+			jpegWriteBuffer.clear();
+			jpegWriteBuffer.put(Integer.toString(frame.getFrameLength()).getBytes());
+			jpegWriteBuffer.put(new byte[]{'\r','\n','\r','\n'});
+			System.out.println("Frame size: " + (frame.getFrameLength()/1024));
+			jpegWriteBuffer.put(frame.getBytes(), 0, frame.getFrameLength());
+			jpegWriteBuffer.flip();
 			isImageAvailable.compareAndSet(false, true);
 			selector.wakeup();
 		} finally {
-			isWriteBufferLocked.compareAndSet(true, false);
+			isJpegBufferLocked.compareAndSet(true, false);
 		}
 	}
 	
 	protected void attemptWriteNextFrame() {
-		if (this.mjpegChannels.size() == 0 || !(this.isImageAvailable.get() && isWriteBufferLocked.compareAndSet(false, true)))
+		if (this.mjpegChannels.size() == 0 || !(this.isImageAvailable.get() && isJpegBufferLocked.compareAndSet(false, true)))
 			return;
 		System.out.print('W');
 		System.out.print(this.mjpegChannels.size());
@@ -185,7 +191,7 @@ public class MJPEGServer implements Runnable {
 					continue;
 				}
 				try {
-					if (channel.write(HTTP_FRAME_MJPEG.duplicate()) < 0 || channel.write(writeBuffer) < 0)
+					if (channel.write(HTTP_FRAME_MJPEG.duplicate()) < 0 || channel.write(jpegWriteBuffer) < 0)
 						this.mjpegChannels.remove(id);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -193,7 +199,7 @@ public class MJPEGServer implements Runnable {
 			}
 		} finally {
 			isImageAvailable.set(false);
-			isWriteBufferLocked.set(false);
+			isJpegBufferLocked.set(false);
 		}
 	}
 
@@ -240,14 +246,42 @@ public class MJPEGServer implements Runnable {
 		String[] header = parse(this.readBuffer);
 		System.out.println("Got request: " + header[1]);
 		if (header[1].endsWith("jpg")) {
+			// send the video stream
 			System.out.println("JPG stream");
 			channel.write(MJPEGServer.HTTP_HEAD_MJPEG.duplicate());
 			mjpegChannels.add(id);
 		} else if (header[1].endsWith("ico")) {
+			//Send a 404, because we have no icon
 			System.out.println("Requested ICO");
 			channel.write(MJPEGServer.HTTP_PAGE_404.duplicate());
 			channel.close();
 			channelMap.remove(id);
+		} else if (header[1].endsWith("cvsn")) {
+			//Enable ComputerVision (tm)
+			Main.enableProcessor();
+			channel.write(MJPEGServer.HTTP_PAGE_200.duplicate());
+			ByteBuffer tmp = ByteBuffer.allocate(4);
+			tmp.putChar(Main.processorEnabled ? '1' : '0');
+			channel.write(tmp);
+			channel.close();
+		} else if (header[1].endsWith("pvsn")) {
+			//Enable PeopleVision (tm)
+			Main.disableProcessor();
+			channel.write(MJPEGServer.HTTP_PAGE_200.duplicate());
+			ByteBuffer tmp = ByteBuffer.allocate(4);
+			tmp.putChar(Main.processorEnabled ? '1' : '0');
+			channel.write(tmp);
+			channel.close();
+		} else if (header[1].endsWith("qual/hi")) {
+			//Set camera to high quality
+			Main.setQuality(80);
+			channel.write(MJPEGServer.HTTP_PAGE_200.duplicate());
+			channel.close();
+		} else if (header[1].endsWith("qual/lo")) {
+			//Set camera to low quality
+			Main.setQuality(50);
+			channel.write(MJPEGServer.HTTP_PAGE_200.duplicate());
+			channel.close();
 		} else {
 			System.out.println("Requested main");
 			channel.write(MJPEGServer.HTTP_PAGE_MAIN.duplicate());

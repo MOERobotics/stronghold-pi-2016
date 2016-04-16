@@ -12,6 +12,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -20,6 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.divisors.projectcuttlefish.httpserver.util.ByteUtils;
 import com.divisors.projectcuttlefish.httpserver.util.ByteUtils.ByteBufferTokenizer;
+import com.moe365.mopi.geom.PreciseRectangle;
 
 import au.edu.jcu.v4l4j.VideoFrame;
 
@@ -44,6 +46,7 @@ public class MJPEGServer implements Runnable {
 	 * A generic 200 OK response
 	 */
 	public static final ByteBuffer HTTP_PAGE_200;
+	public static final ByteBuffer HTTP_SSE_HEAD;
 	
 	static {
 		HTTP_PAGE_MAIN = loadHttp("main");
@@ -51,6 +54,7 @@ public class MJPEGServer implements Runnable {
 		HTTP_HEAD_MJPEG = loadHttp("mjpeg-head");
 		HTTP_FRAME_MJPEG = loadHttp("mjpeg-frame-head");
 		HTTP_PAGE_200 = loadHttp("200");
+		HTTP_SSE_HEAD = loadHttp("sse-head");
 	}
 	/**
 	 * Load file from the <code>resources</code> package inside the jar.
@@ -87,8 +91,11 @@ public class MJPEGServer implements Runnable {
 	protected ByteBuffer jpegWriteBuffer = ByteBuffer.allocateDirect(1024 * 100);
 	protected AtomicBoolean isJpegBufferLocked = new AtomicBoolean(false);
 	protected AtomicBoolean isImageAvailable = new AtomicBoolean(false);
+	protected volatile ByteBuffer rectangleWriteBuffer = null;
+	protected AtomicBoolean areRectanglesAvailable = new AtomicBoolean(false);
 	protected ConcurrentHashMap<Long, SocketChannel> channelMap = new ConcurrentHashMap<>();
 	protected volatile Set<Long> mjpegChannels = ConcurrentHashMap.newKeySet();
+	protected volatile Set<Long> jsonSSEChannels = ConcurrentHashMap.newKeySet();
 	protected AtomicBoolean shouldBeRunning = new AtomicBoolean(false);
 
 	/**
@@ -116,6 +123,9 @@ public class MJPEGServer implements Runnable {
 		return this;
 	}
 
+	/**
+	 * Start the server
+	 */
 	public void start() {
 		System.out.println("Starting MJPEG server @ " + address.toString());
 		if (executor == null) {
@@ -150,6 +160,7 @@ public class MJPEGServer implements Runnable {
 					}
 				}
 				attemptWriteNextFrame();
+				attemptUpdateSSE();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -157,7 +168,12 @@ public class MJPEGServer implements Runnable {
 		System.out.println("Server stopped.");
 	}
 	
-	public void onNextFrame(VideoFrame frame) {
+	/**
+	 * Offer a frame to be served in the MJPEG stream. After calling this
+	 * method, the frame CAN be recycled.
+	 * @param frame Frame to add to the MJPEG stream
+	 */
+	public void offerFrame(VideoFrame frame) {
 		if (isImageAvailable.get() || (!isJpegBufferLocked.compareAndSet(false, true))) {
 			System.err.print('D');
 			return;
@@ -176,6 +192,50 @@ public class MJPEGServer implements Runnable {
 		}
 	}
 	
+	public void offerRectangles(List<PreciseRectangle> rectangles) {
+		if (jsonSSEChannels.size() == 0)
+			//Don't waste time on building the data, if nobody's there to listen
+			return;
+		StringBuffer sb = new StringBuffer("event: udrects\r\ndata: [");
+		if (rectangles != null && (!rectangles.isEmpty())) {
+			for (PreciseRectangle rectangle : rectangles) {
+				sb.append('[')
+					.append(rectangle.getX()).append(',')
+					.append(rectangle.getY()).append(',')
+					.append(rectangle.getWidth()).append(',')
+					.append(rectangle.getHeight()).append("],");
+			}
+			sb.delete(sb.length() - 1, sb.length());
+		}
+		sb.append("]\r\n\r\n");
+		rectangleWriteBuffer = ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8));
+		areRectanglesAvailable.set(true);
+	}
+	protected void attemptUpdateSSE() {
+		if (this.jsonSSEChannels.isEmpty() || (!areRectanglesAvailable.get()))
+			return;
+		System.out.println("WRITING SSE to " + jsonSSEChannels.size() + " channels");
+		try {
+			ByteBuffer buffer = this.rectangleWriteBuffer;
+			if (buffer == null)
+				return;
+			for (Long id : this.jsonSSEChannels) {
+				SocketChannel channel = this.channelMap.get(id);
+				if (channel == null || !channel.isOpen()) {
+					this.jsonSSEChannels.remove(id);
+					continue;
+				}
+				try {
+					if (channel.write(buffer.duplicate()) < 0)
+						this.jsonSSEChannels.remove(id);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		} finally {
+			areRectanglesAvailable.set(false);
+		}
+	}
 	protected void attemptWriteNextFrame() {
 		if (this.mjpegChannels.size() == 0 || !(this.isImageAvailable.get() && isJpegBufferLocked.compareAndSet(false, true)))
 			return;
@@ -272,6 +332,10 @@ public class MJPEGServer implements Runnable {
 			tmp.putChar(Main.processorEnabled ? '1' : '0');
 			channel.write(tmp);
 			channel.close();
+		} else if (header[1].endsWith("results.sse")) {
+			System.out.println("Rectangle SSE stream");
+			channel.write(MJPEGServer.HTTP_SSE_HEAD.duplicate());
+			jsonSSEChannels.add(id);
 		} else if (header[1].endsWith("qual/hi")) {
 			//Set camera to high quality
 			Main.setQuality(80);

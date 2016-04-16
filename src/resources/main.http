@@ -75,9 +75,35 @@ Content-Type: text/html\r\n
 					overlay.c = Math.round(Math.random() * colors.length);
 			}
 			function updateOverlays() {
+			var events;
+			function beginSSE() {
+				events = new EventSource("/results.sse");
+				events.addEventListener('udrects', evt => {
+					var rectangles = JSON.parse(evt.data);
+					console.log(rectangles);
+					updateOverlays(true);
+					for (var i in rectangles) {
+						var rect = rectangles[i];
+						rect[0] *= cvs.width;
+						rect[1] *= cvs.height;
+						rect[2] *= cvs.width;
+						rect[3] *= cvs.height;
+						ctx.strokeStyle = colors[i % colors.length];
+						ctx.beginPath();
+						ctx.moveTo(rect[0], rect[1]);
+						ctx.lineTo(rect[0] + rect[2], rect[1]);
+						ctx.lineTo(rect[0] + rect[2], rect[1] + rect[3]);
+						ctx.lineTo(rect[0], rect[1] + rect[3]);
+						ctx.closePath();
+						ctx.stroke();
+					}
+				});
+			}
+			function updateOverlays(quiet) {
 				var w = cvs.width * .05;
 				var h = cvs.height * .1;
-				console.groupCollapsed('Drawing overlays');
+				if (!quiet)
+					console.groupCollapsed('Drawing overlays');
 				ctx.clearRect(0,0,cvs.width, cvs.height);
 				for (var i in overlays) {
 					ctx.strokeStyle = colors[overlays[i].c];
@@ -96,9 +122,11 @@ Content-Type: text/html\r\n
 						ctx.ellipse(x, y, w, h, 0, 0, 2 * Math.PI);
 						ctx.stroke();
 					}
-					console.info({x:x,y:y,px:overlays[i].x/cvs.width,py:overlays[i].y/cvs.height});
+					if (!quiet)
+						console.info({x:x,y:y,px:overlays[i].x/cvs.width,py:overlays[i].y/cvs.height});
 				}
-				console.groupEnd();
+				if (!quiet)
+					console.groupEnd();
 			}
 			updateOverlays();
 			function reset() {
@@ -196,4 +224,3 @@ Content-Type: text/html\r\n
 		</script>
 	</body>
 </html>
-

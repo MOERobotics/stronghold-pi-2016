@@ -42,17 +42,33 @@ Content-Type: text/html\r\n
 				color: yellow;
 				content: 'Unlocked';
 			}
+			.cv-label {
+				position: fixed;
+				top: 0;
+				left: 0;
+			}
+			.cv-label.pplvision:before {
+				color: green;
+				content: 'PeopleVision';
+			}
+			.cv-label.cmpvision:before {
+				color: red;
+				content: 'ComputerVision';
+			}
 		</style>
 	</head>
 	<body>
 		<img src="stream.jpg"/>
 		<canvas></canvas>
-		<button onclick="window.open(document.URL+'#no_popup','_blank','height=240,width=320,chrome=yes,scrollbars=yes,status=no,menubar=no,toolbar=no,location=no')">F</button>
+		<button id="popup-button" onclick="window.open(document.URL+'#is_popup','_blank','height=240,width=320,chrome=yes,scrollbars=yes,status=no,menubar=no,toolbar=no,location=no')">F</button>
 		<span class="lock-label locked"></span>
+		<span class="cv-label cmpvision"></span>
+		
 		<script type="application/javascript">
+			'use strict';
 			var $_ = document.querySelector.bind(document);
-			if (window.location.hash.indexOf('no_popup')>=0)
-				$_('button').remove();
+			if (window.location.hash.indexOf('is_popup') >= 0)
+				$_('#popup-button').remove();
 			var colors = ['#F00','#0F0','#00F','#FF0','#F0F','#0FF','purple','orange','pink','grey','chartreuse'];
 			var cvs = $_('canvas');
 			cvs.width = cvs.getClientRects()[0].width;
@@ -63,18 +79,48 @@ Content-Type: text/html\r\n
 			ctx.strokeStyle='#0F0';
 			var selected = 0;
 			var locked = true;
+			var isCvMode = true;
+			var isHQ = true;
 			var overlays = [{x:.5,y:.5},{x:.5,y:.5}];
-			if ('overlay' in localStorage)
-				overlays = [JSON.parse(localStorage['overlay']),{x:.5,y:.5}];/*backwards compat.*/
-			if ('overlays' in localStorage)
+			if ('overlays' in localStorage) {
 				overlays = JSON.parse(localStorage['overlays']);
+			} else if ('overlay' in localStorage) {
+				overlays = [JSON.parse(localStorage['overlay']),{x:.5,y:.5}];/*backwards compat.*/
+			}
 			for (let overlay of overlays) {
 				overlay.x *= cvs.width;
 				overlay.y *= cvs.height;
 				if (!('c' in overlay))
 					overlay.c = Math.round(Math.random() * colors.length);
 			}
-			function updateOverlays() {
+			function getXHR(path) {
+				var xhr = new XMLHttpRequest();
+				xhr.open('GET', path, true);
+				return new Promise((yay, nay) => {
+					xhr.onload = yay;
+					xhr.onerror = (e) => {
+						console.error(e);
+						nay(e);
+					};
+					xhr.send();
+				});
+			}
+			function setCvMode(mode) {
+				getXHR('/' + (mode ? 'c' : 'p') + 'vsn')
+					.then((e)=> {
+						isCvMode = mode;
+						var lblcl = $_('.cv-label').classList;
+						lblcl.remove('pplvision','cmpvision');
+						lblcl.add(isCvMode ? 'cmpvision' : 'pplvision');
+					});
+			}
+			function setQuality(hq) {
+				getXHR('/qual/' + (hq ? 'hi' : 'lo'))
+					.then((e) => {
+						console.log("Set quality to " + (hq ? "HIGH" : "LOW"));
+						isHQ = hq;
+					});
+			}
 			var events;
 			function beginSSE() {
 				events = new EventSource("/results.sse");
@@ -165,6 +211,19 @@ Content-Type: text/html\r\n
 				localStorage['overlays'] = JSON.stringify(tmp);
 				updateOverlays();
 			}
+			function exportOverlays() {
+				var element = document.createElement('a');
+				element.setAttribute('href', 'data:text/json;charset=utf-8,' + encodeURIComponent(localStorage['overlays']));
+				element.setAttribute('download', 'MoePi Export - ' + Date.now() + '.json');
+				element.style.display='none';
+				document.body.appendChild(element);
+				element.click();
+				document.body.removeChild(element);
+			}
+			function importOverlays(text) {
+				localStorage['overlays'] = text;
+				window.location.reload();/*refresh*/
+			}
 			document.addEventListener('keydown',function(e) {
 				var dx = 0, dy = 0;
 				console.log('keydown',{key:e.key, code:e.code});
@@ -194,6 +253,7 @@ Content-Type: text/html\r\n
 					overlay.c++;
 					if (overlay.c > colors.length - 1)
 						overlay.c = 0;
+					return;
 				} else if (e.code == 'Tab') {
 					e.preventDefault();
 					if (locked) {
@@ -206,6 +266,13 @@ Content-Type: text/html\r\n
 					if (selected > overlays.length - 1)
 						selected = 0;
 					updateOverlays();
+					return;
+				} else if (e.key == '1' || e.code == 'Digit1') {
+					setCvMode(!isCvMode);
+					return;
+				} else if (e.key == 'q' || e.code == 'KeyQ') {
+					setQuality(!isHQ);
+					return;
 				} else {
 					console.warn('Unknown key pressed', e);
 					return;

@@ -9,11 +9,14 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
+import com.moe365.mopi.geom.PreciseRectangle;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.gpio.GpioPinDigitalOutput;
@@ -60,9 +63,15 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.1.4-alpha";
+	public static final String version = "0.1.5-alpha";
 	public static int width;
 	public static int height;
+	public static volatile boolean processorEnabled = true;
+	public static MJPEGServer httpServer;
+	public static VideoDevice camera;
+	public static RoboRioClient rioClient;
+	public static JPEGFrameGrabber frameGrabber;
+	public static ImageProcessor processor;
 	public static void main(String...fred) throws IOException, V4L4JException, InterruptedException {
 		CommandLineParser parser = loadParser();
 		ParsedCommandLineArguments parsed = parser.apply(fred);
@@ -83,15 +92,15 @@ public class Main {
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
-		final MJPEGServer server = initServer(parsed);
+		final MJPEGServer server = httpServer = initServer(parsed);
 		
-		final VideoDevice device = initCamera(parsed);
+		final VideoDevice device = camera =  initCamera(parsed);
 		
 		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
 		
-		final RoboRioClient client = initClient(parsed);
+		final RoboRioClient client = rioClient = initClient(parsed);
 		
-		final ImageProcessor tracer = initProcessor(parsed, client);
+		final ImageProcessor tracer = processor = initProcessor(parsed, client);
 		
 		final AtomicBoolean ledState = new AtomicBoolean(false);
 		
@@ -116,43 +125,45 @@ public class Main {
 		
 		final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
 		System.out.println("JPEG quality: " + jpegQuality + "%");
-		JPEGFrameGrabber fg = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality);
-		fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
-		System.out.println("Framerate: " + fg.getFrameInterval());
-		
-		fg.setCaptureCallback(new CaptureCallback() {
-			@Override
-			public void nextFrame(VideoFrame frame) {
-				try {
-					if (server != null && ledState.get())
-						server.onNextFrame(frame);
-					if (tracer != null) {
-						tracer.update(frame, ledState.get());
-					} else {
-						frame.recycle();
-					}
-//					System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
-					gpioPin.setState(!ledState.get());
-					ledState.set(!ledState.get());
-				} catch (Exception e) {
-					e.printStackTrace();
-					throw e;
-				}
-			}
-
-			@Override
-			public void exceptionReceived(V4L4JException e) {
-				e.printStackTrace();
-				fg.stopCapture();
-				if (server != null)
+		if (device != null) {
+			final JPEGFrameGrabber fg = frameGrabber = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality);
+			fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
+			System.out.println("Framerate: " + fg.getFrameInterval());
+			
+			fg.setCaptureCallback(new CaptureCallback() {
+				@Override
+				public void nextFrame(VideoFrame frame) {
 					try {
-						server.shutdown();
-					} catch (IOException e1) {
-						e1.printStackTrace();
+						if (server != null && ledState.get())
+							server.offerFrame(frame);
+						if (tracer != null && processorEnabled) {
+							tracer.update(frame, ledState.get());
+						} else {
+							frame.recycle();
+						}
+//						System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
+						ledState.set(!ledState.get());
+						gpioPin.setState(ledState.get() || (!processorEnabled));
+					} catch (Exception e) {
+						e.printStackTrace();
+						throw e;
 					}
-			}
-		});
-		fg.startCapture();
+				}
+	
+				@Override
+				public void exceptionReceived(V4L4JException e) {
+					e.printStackTrace();
+					fg.stopCapture();
+					if (server != null)
+						try {
+							server.shutdown();
+						} catch (IOException e1) {
+							e1.printStackTrace();
+						}
+				}
+			});
+			fg.startCapture();
+		}
 	}
 	protected static void testClient(RoboRioClient client) throws IOException, InterruptedException {
 		System.out.println("RUNNING TEST: CLIENT");
@@ -243,6 +254,8 @@ public class Main {
 		return pin;
 	}
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args) throws SocketException {
+		if (args.isFlagSet("--no-udp"))
+			return null;
 		int port = args.getOrDefault("--rio-port", RoboRioClient.RIO_PORT);
 		if (port < 0)
 			return null;
@@ -256,7 +269,12 @@ public class Main {
 			System.out.println("PROCESSOR DISABLED");
 			return null;
 		} else {
-			return new ImageProcessor(width, height, client).start();
+			processor = new ImageProcessor(width, height, client);
+			if (args.isFlagSet("--save-diff"))
+				processor.saveDiff = true;
+			processor.start();
+			enableProcessor();
+			return processor;
 			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
 		}
 	}
@@ -335,7 +353,9 @@ public class Main {
 			.addKvPair("--fps-denom", "denom", "Set FPS denominator")
 			.addFlag("--no-process", "Disable image processing")
 			.addFlag("--no-camera", "Do not specify a camera")
+			.addFlag("--no-udp", "Disable broadcasting UDP")
 			.addFlag("--no-gpio", "Do not specify a gpio pin")
+			.addFlag("--save-diff", "Save the diff image to a file. Requires processor.")
 			.addKvPair("--jpeg-quality", "quality", "Set the JPEG quality to request")
 			.build();
 		File outputFile = new File("src/resources/parser.ser");

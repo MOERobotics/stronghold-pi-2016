@@ -2,6 +2,7 @@ package com.moe365.mopi;
 
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -10,6 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+
+import javax.imageio.ImageIO;
 
 import com.moe365.mopi.geom.PreciseRectangle;
 
@@ -22,6 +25,7 @@ public class ImageProcessor implements Runnable {
 		return (byte) (num > 0xFF ? 0xFF : num < 0 ? 0 : num);
 	}
 	
+	public boolean saveDiff = false;
 	AtomicBoolean imageLock = new AtomicBoolean(false);
 	protected final RoboRioClient client;
 	/**
@@ -77,7 +81,13 @@ public class ImageProcessor implements Runnable {
 					Thread.sleep(100);
 				if (!imageLock.compareAndSet(false, true))
 					throw new IllegalStateException();
+				//check again, just to be safe
+				if (frameOff.get() != null && frameOn.get() != null) {
+					if (saveDiff)
+						calcDeltaWithDiff(img);
+					else
 						calcDeltaAdv();
+				}
 				if (!imageLock.compareAndSet(true, false))
 					throw new IllegalStateException();
 			}
@@ -125,9 +135,7 @@ public class ImageProcessor implements Runnable {
 		buf[1] = (px >> 8) & 0xFF;
 		buf[2] = px & 0xFF;
 	}
-	@SuppressWarnings("unused")
-	public void calcDeltaAdv(BufferedImage img) {
-		// Whether the value of any cell in result[][] is valid (has been
+	public void calcDeltaWithDiff(BufferedImage img) {
 		// calculated yet)
 		boolean[][] processed = new boolean[height][width];
 		// boolean array of the results. A cell @ result[y][x] is only
@@ -139,6 +147,8 @@ public class ImageProcessor implements Runnable {
 			return;
 		BufferedImage off = this.frameOff.get().getBufferedImage();
 		BufferedImage on = this.frameOn.get().getBufferedImage();
+		System.out.println("CM: " + on.getColorModel());
+		System.out.println("CMCL: " + on.getColorModel().getClass());
 		int[] pxOn = new int[3], pxOff = new int[3];
 		for (int y=step; y < height - step; y+=step) {
 			for (int x = step + ((y % (2 * step) == 0) ? step/2 : 0); x < width - step; x += step) {
@@ -151,8 +161,8 @@ public class ImageProcessor implements Runnable {
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
-				if (dR < tolerance && dG > tolerance)
-					px = (Math.min(dR, 0xFF) << 16) | (Math.min(dG, 0xFF) << 8) | (Math.min(dB, 0xFF));
+				if (dG > tolerance)
+					px = (saturateByte(dR) << 16) | (saturateByte(dG) << 8) | saturateByte(dB);
 				/*if (dG > tolerance) {
 					for (int i = y - step/2; i < y + step/2; i++) {
 						for (int j = x - step/2; j < x + step/2; x++) {
@@ -169,8 +179,8 @@ public class ImageProcessor implements Runnable {
 					result[y][x] = true;
 //				if (dB > tolerance)
 //					px |= 0xFF;
-//				img.setRGB(x, y, px);
-				/*if (pxOn[1] - pxOff[1] > 50) {
+				img.setRGB(x, y, px);
+				/*if (dG > 50) {
 					for (int y1 = Math.max(0, y-15); y1 < Math.min(height, y + 15); y1++) {
 						for (int x1 = Math.max(0, x-15); x1 < Math.min(width, x + 15); x1++) {
 							if (processed[y1][x1])
@@ -179,18 +189,27 @@ public class ImageProcessor implements Runnable {
 							px = 0;
 							split(on.getRGB(x1, y1), pxOn);
 							split(off.getRGB(x1, y1), pxOff);
-//							if (pxOn[0] - pxOff[0] > 50)
-//								px |= 0xFF0000;
+							if (pxOn[0] - pxOff[0] > 50)
+								px |= 0xFF0000;
 							if (pxOn[1] - pxOff[1] > 50)
 								px |= 0xFF00;
-//							if (pxOn[2] - pxOff[2] > 50)
-//								px |= 0xFF;
+							if (pxOn[2] - pxOff[2] > 50)
+								px |= 0xFF;
 							img.setRGB(x1, y1, px);
 						}
 					}
 				}*/
 			}
 		}
+		try {
+			File file = new File("img/delta" + i.getAndIncrement() + ".png");
+			System.out.println("Saving image to " + file);
+			ImageIO.write(img, "PNG", file);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		processBooleanMap(result);
+	}
 	@SuppressWarnings("unused")
 	public void calcDeltaAdv() {
 		// Whether the value of any cell in result[][] is valid (has been

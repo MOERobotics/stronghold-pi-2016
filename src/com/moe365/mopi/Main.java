@@ -63,7 +63,7 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.1.6-alpha";
+	public static final String version = "0.1.7-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -277,6 +277,69 @@ public class Main {
 			return processor;
 			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
 		}
+	}
+	public static void enableProcessor() {
+		System.out.println("ENABLING CV");
+		if (processor == null) {
+			if (processorEnabled)
+				disableProcessor();
+			return;
+		}
+		if (camera == null) {
+			processorEnabled = false;
+			return;
+		}
+		try {
+			ControlList controls = camera.getControlList();
+			controls.getControl("Exposure, Auto").setValue(1);
+			controls.getControl("Exposure (Absolute)").setValue(19);
+			controls.getControl("Contrast").setValue(10);
+//			Control whiteBalanceControl = controls.getControl(don't remember what goes here);
+//			whiteBalanceControl.setValue(whiteBalanceControl.getMaxValue());
+			Control saturationControl = controls.getControl("Saturation");
+			saturationControl.setValue(saturationControl.getMaxValue());
+			Control sharpnessControl = controls.getControl("Sharpness");
+			sharpnessControl.setValue(50);
+			Control brightnessControl = controls.getControl("Brightness");
+			brightnessControl.setValue(42);
+		} catch (ControlException | UnsupportedMethod | StateException e) {
+			e.printStackTrace();
+		} finally {
+			camera.releaseControlList();
+		}
+		processorEnabled = true;
+	}
+	/**
+	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
+	 */
+	public static void disableProcessor() {
+		System.out.println("DISABLING CV");
+		if (camera == null) {
+			processorEnabled = false;
+			return;
+		}
+		try {
+			ControlList controls = camera.getControlList();
+			try {
+				controls.getControl("Exposure, Auto").setValue(2);
+			} catch (ControlException e) {}
+			controls.getControl("Exposure (Absolute)").setValue(156);
+			controls.getControl("Contrast").setValue(10);
+			controls.getControl("Saturation").setValue(83);
+			controls.getControl("Sharpness").setValue(50);
+			controls.getControl("Brightness").setValue(42);
+		} catch (ControlException | UnsupportedMethod | StateException e) {
+			e.printStackTrace();
+		} finally {
+			camera.releaseControlList();
+		}
+		processorEnabled = false;
+	}
+	public static void setQuality(int quality) {
+		if (frameGrabber == null)
+			return;
+		System.out.println("SETTING QUALITY TO " + quality);
+		frameGrabber.setJPGQuality(quality);
 	}
 	/**
 	 * Create and initialize the server

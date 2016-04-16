@@ -63,7 +63,7 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.1.7-alpha";
+	public static final String version = "0.1.8-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -116,6 +116,8 @@ public class Main {
 				case "client":
 					testClient(client);
 					break;
+				case "sse":
+					testSSE();
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
@@ -177,6 +179,20 @@ public class Main {
 			Thread.sleep(1000);
 			System.out.println("Writing r2");
 			client.writeTwoFound(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.2);
+			Thread.sleep(1000);
+		}
+	}
+	protected static void testSSE() throws InterruptedException {
+		System.out.println("RUNNING TEST: SSE");
+		while (true) {
+			List<PreciseRectangle> rects = new LinkedList<>();
+			httpServer.offerRectangles(rects);
+			Thread.sleep(1000);
+			rects.add(new PreciseRectangle(0.0,0.0,0.2,0.2));
+			httpServer.offerRectangles(rects);
+			Thread.sleep(1000);
+			rects.add(new PreciseRectangle(0.25,0.75,0.3,0.1));
+			httpServer.offerRectangles(rects);
 			Thread.sleep(1000);
 		}
 	}

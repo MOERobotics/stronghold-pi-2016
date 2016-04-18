@@ -10,6 +10,8 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.moe365.mopi.geom.PreciseRectangle;
+
 /**
  * UDP server to broadcast data at the RIO.
  * <p>
@@ -133,6 +135,9 @@ public class RoboRioClient implements Closeable, Runnable {
 	public void writeNoneFound() throws IOException {
 		write(STATUS_NONE_FOUND);
 	}
+	public void writeOneFound(PreciseRectangle rect) throws IOException {
+		writeOneFound(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+	}
 	public void writeOneFound(double left, double top, double width, double height) throws IOException {
 		build(STATUS_ONE_FOUND, (short) 0);
 		buffer.putDouble(top);
@@ -140,6 +145,9 @@ public class RoboRioClient implements Closeable, Runnable {
 		buffer.putDouble(width);
 		buffer.putDouble(height);
 		socket.send(packet_40);
+	}
+	public void writeTwoFound(PreciseRectangle rect1, PreciseRectangle rect2) throws IOException {
+		writeTwoFound(rect1.getX(), rect1.getY(), rect1.getWidth(), rect1.getHeight(), rect2.getX(), rect2.getY(), rect2.getWidth(), rect2.getHeight());
 	}
 	public void writeTwoFound(double left1, double top1, double width1, double height1, double left2, double top2, double width2, double height2) throws IOException {
 		build(STATUS_TWO_FOUND, (short) 0);

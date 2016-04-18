@@ -22,10 +22,20 @@ public class ImageProcessor implements Runnable {
 	public static final int step = 1, tolerance = 70;
 	
 	public static byte saturateByte(int num) {
-		return (byte) (num > 0xFF ? 0xFF : num < 0 ? 0 : num);
+		return (num > 0xFF) ? ((byte)0xFF) : ((num < 0) ? 0 : ((byte)num));
 	}
-	
+	public static void split(int px, int[] buf) {
+		buf[0] = (px >>> 16) & 0xFF;
+		buf[1] = (px >> 8) & 0xFF;
+		buf[2] = px & 0xFF;
+	}
+	/**
+	 * Whether to save the diff generated.
+	 */
 	public boolean saveDiff = false;
+	/**
+	 * Whether the processor is currently processing images.
+	 */
 	AtomicBoolean imageLock = new AtomicBoolean(false);
 	protected final RoboRioClient client;
 	/**
@@ -81,19 +91,32 @@ public class ImageProcessor implements Runnable {
 					Thread.sleep(100);
 				if (!imageLock.compareAndSet(false, true))
 					throw new IllegalStateException();
-				//check again, just to be safe
-				if (frameOff.get() != null && frameOn.get() != null) {
-					if (saveDiff)
-						calcDeltaWithDiff(img);
-					else
-						calcDeltaAdv();
+				try {
+					//check again, just to be safe
+					if (frameOff.get() != null && frameOn.get() != null) {
+						if (saveDiff)
+							calcDeltaWithDiff(img);
+						else
+							calcDeltaAdv();
+						//release the processed frames
+						frameOff.get().recycle();
+						frameOff.set(null);
+						frameOn.get().recycle();
+						frameOn.set(null);
+					}
+				} finally {
+					//release the lock on images
+					if (!imageLock.compareAndSet(true, false))
+						throw new IllegalStateException();
 				}
-				if (!imageLock.compareAndSet(true, false))
-					throw new IllegalStateException();
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 			return;
+		} catch (Exception e) {
+			//be sure to print any/all exceptions
+			e.printStackTrace();
+			throw e;
 		}
 	}
 	public void read(VideoFrame frame, short[][] red, short[][] green, short[][] blue) {
@@ -130,11 +153,6 @@ public class ImageProcessor implements Runnable {
 		}
 		System.out.println("(done)");
 	}
-	public void split(int px, int[] buf) {
-		buf[0] = (px >>> 16) & 0xFF;
-		buf[1] = (px >> 8) & 0xFF;
-		buf[2] = px & 0xFF;
-	}
 	public void calcDeltaWithDiff(BufferedImage img) {
 		// calculated yet)
 		boolean[][] processed = new boolean[height][width];
@@ -155,14 +173,12 @@ public class ImageProcessor implements Runnable {
 				if (processed[y][x])
 					continue;
 				processed[y][x] = true;
-				int px = 0;
 				split(on.getRGB(x, y), pxOn);
 				split(off.getRGB(x, y), pxOff);
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
-				if (dG > tolerance)
-					px = (saturateByte(dR) << 16) | (saturateByte(dG) << 8) | saturateByte(dB);
+				int px = (saturateByte(dR) << 16) | (saturateByte(dG) << 8) | saturateByte(dB);
 				/*if (dG > tolerance) {
 					for (int i = y - step/2; i < y + step/2; i++) {
 						for (int j = x - step/2; j < x + step/2; x++) {
@@ -180,7 +196,7 @@ public class ImageProcessor implements Runnable {
 //				if (dB > tolerance)
 //					px |= 0xFF;
 				img.setRGB(x, y, px);
-				/*if (dG > 50) {
+				/*if (dG > tolerance) {
 					for (int y1 = Math.max(0, y-15); y1 < Math.min(height, y + 15); y1++) {
 						for (int x1 = Math.max(0, x-15); x1 < Math.min(width, x + 15); x1++) {
 							if (processed[y1][x1])
@@ -202,7 +218,10 @@ public class ImageProcessor implements Runnable {
 			}
 		}
 		try {
-			File file = new File("img/delta" + i.getAndIncrement() + ".png");
+			File imgDir = new File("img");
+			if (!(imgDir.exists() && imgDir.isDirectory()))
+				imgDir.mkdirs();
+			File file = new File(imgDir, "delta" + i.getAndIncrement() + ".png");
 			System.out.println("Saving image to " + file);
 			ImageIO.write(img, "PNG", file);
 		} catch (Exception e) {
@@ -249,14 +268,18 @@ public class ImageProcessor implements Runnable {
 		List<PreciseRectangle> rectangles;
 		{
 			List<Rectangle> upRects = new LinkedList<>();
+			//find rectangles
 			BoundingBoxThing.boundingBoxRecursive(processed, upRects, 0, processed[0].length - 1, 0, processed.length - 1, -1, -1, -1, -1);
+			//sort the rectangles by area
 			upRects.sort((a,b)->(Double.compare(b.getWidth() * b.getHeight(), a.getWidth() * a.getHeight())));
 			final double wf = 1.0 / ((double) width);
 			final double hf = 1.0 / ((double) height);
+			//scale the rectangles to be in terms of width/height
 			rectangles = upRects.stream()
 					.map(r->(new PreciseRectangle(r).scale(wf, hf, wf, hf)))
 					.collect(Collectors.toList());
 		}
+		//print the rectangles' dimensions to STDOUT
 		for (PreciseRectangle rectangle : rectangles) {
 			double x = rectangle.getX();
 			double y = rectangle.getY();
@@ -264,31 +287,21 @@ public class ImageProcessor implements Runnable {
 			double rh = rectangle.getHeight();
 			System.out.println("=>X: " + x + "; Y: " + y + "; W: " + rw + "; H:" + rh);
 		}
+		//send the largest rectangle(s) to the Rio
 		try {
 			if (client != null) {
 				if (rectangles.isEmpty()) {
 					client.writeNoneFound();
+				} else if (rectangles.size() == 1) {
+					client.writeOneFound(rectangles.get(0));
 				} else {
-					PreciseRectangle rect0 = rectangles.get(0);
-					double x0 = rect0.getX();
-					double y0 = rect0.getY();
-					double w0 = rect0.getWidth();
-					double h0 = rect0.getHeight();
-					if (rectangles.size() == 1) {
-						client.writeOneFound(x0, y0, w0, h0);
-					} else {
-						PreciseRectangle rect1 = rectangles.get(1);
-						double x1 = rect1.getX();
-						double y1 = rect1.getY();
-						double w1 = rect1.getWidth();
-						double h1 = rect1.getHeight();
-						client.writeTwoFound(x0, y0, w0, h0, x1, h1, w1, h1);
-					}
+					client.writeTwoFound(rectangles.get(0), rectangles.get(1));
 				}
 			}
 		} catch (IOException | NullPointerException e) {
 			e.printStackTrace();
 		}
+		//Offer the rectangles to be put in the SSE stream
 		if (Main.httpServer != null)
 			Main.httpServer.offerRectangles(rectangles);
 		System.out.println("(done)");

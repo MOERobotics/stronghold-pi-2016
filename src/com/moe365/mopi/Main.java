@@ -102,6 +102,7 @@ public class Main {
 		
 		final ImageProcessor tracer = processor = initProcessor(parsed, client);
 		
+		//The state of the LED. Used for timing.
 		final AtomicBoolean ledState = new AtomicBoolean(false);
 		
 		if (parsed.isFlagSet("--test")) {
@@ -147,6 +148,7 @@ public class Main {
 						ledState.set(!ledState.get());
 						gpioPin.setState(ledState.get() || (!processorEnabled));
 					} catch (Exception e) {
+						//Make sure to print any/all exceptions
 						e.printStackTrace();
 						throw e;
 					}
@@ -260,13 +262,16 @@ public class Main {
 		final GpioController gpio = GpioFactory.getInstance();
 		GpioPinDigitalOutput pin;
 		if (args.isFlagSet("--gpio-pin")) {
-			pin = gpio.provisionDigitalOutputPin(RaspiPin.getPinByName(args.get("--gpio-pin")), "LED pin", PinState.LOW);
+			String pinName = args.get("--gpio-pin");
+			if (!pinName.startsWith("GPIO ") && pinName.matches("\\d+"))
+				pinName = "GPIO " + pinName.trim();
+			pin = gpio.provisionDigitalOutputPin(RaspiPin.getPinByName(pinName), "LED pin", PinState.LOW);
 		} else {
 			pin = gpio.provisionDigitalOutputPin(RaspiPin.GPIO_01, "LED pin", PinState.LOW);
 		}
 		System.out.println("Using GPIO pin " + pin.getPin());
 		pin.setMode(PinMode.DIGITAL_OUTPUT);
-		pin.setState(false);
+		pin.setState(false);//turn it off
 		return pin;
 	}
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args) throws SocketException {
@@ -327,6 +332,8 @@ public class Main {
 	}
 	/**
 	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
+	 * <p>
+	 * This 
 	 */
 	public static void disableProcessor() {
 		System.out.println("DISABLING CV");
@@ -351,6 +358,11 @@ public class Main {
 		}
 		processorEnabled = false;
 	}
+	/**
+	 * Set the JPEG quality from the camera. Tests have shown that this does <b>NOT</b> reduce the
+	 * MJPEG stream's bandwidth.
+	 * @param quality quality to set. Must be 0 to 100 (inclusive)
+	 */
 	public static void setQuality(int quality) {
 		if (frameGrabber == null)
 			return;
@@ -379,6 +391,12 @@ public class Main {
 	protected static void testConverter(VideoDevice dev) {
 		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
 	}
+	/**
+	 * Binds to and initializes the camera.
+	 * @param args parsed command line arguments
+	 * @return the camera device, or null if <kbd>--no-camera</kbd> is set.
+	 * @throws V4L4JException
+	 */
 	protected static VideoDevice initCamera(ParsedCommandLineArguments args) throws V4L4JException {
 		String devName = args.getOrDefault("--camera", "/dev/video0");
 		if (args.isFlagSet("--no-camera"))
@@ -394,6 +412,10 @@ public class Main {
 		System.out.println("SUCCESS");
 		return device;
 	}
+	/**
+	 * Loads the CommandLineParser from inside the JAR.
+	 * @return parser.
+	 */
 	protected static CommandLineParser loadParser() {
 		try (ObjectInput in = new ObjectInputStream(Main.class.getResourceAsStream("/resources/parser.ser"))) {
 			return (CommandLineParser) in.readObject();
@@ -408,34 +430,36 @@ public class Main {
 			.addFlag("--help", "Displays the help message and exits")
 			.alias("-h", "--help")
 			.alias("-?", "--help")
-			.addKvPair("--camera", "device", "Specify the camera to use")
+			.addKvPair("--camera", "device", "Specify the camera device file to use. Default '/dev/video0'")
 			.alias("-C", "--camera")
-			.addFlag("--verbose", "Enable verbose output")
+			.addFlag("--verbose", "Enable verbose output (not implemented)")
 			.alias("-v", "--verbose")
-			.addFlag("--out", "Specify where to write log messages to")
-			.addKvPair("--port", "port", "Specify the port to listen on. Default 0, or autodetect; a negative port is equivalent to --no-server")
+			.addFlag("--out", "Specify where to write log messages to (not implemented)")
+			.addKvPair("--port", "port", "Specify the port for the HTTP server to listen on. Default 5800; a negative port number is equivalent to --no-server")
 			.alias("-p", "--port")
-			.addFlag("--no-server", "Disables server")
-			.addFlag("--version", "Print version string")
-			.addKvPair("--rio-addr", "address", "Specify where to find the RoboRio")
-			.addKvPair("--rio-port", "port", "Specify the port to use on the RoboRio")
-			.addKvPair("--props", "file", "Specify the file to read properties from")
-			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future")
-			.addFlag("--rebuild-parser", "Rebuilds the parser object")
-			.addKvPair("--test", "target", "Run test by name")
-			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use")
-			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis")
-			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis")
-			.addKvPair("--width", "px", "Width of image")
-			.addKvPair("--height", "px", "Height of image")
-			.addKvPair("--fps-num", "numerator", "Set FPS numerator")
-			.addKvPair("--fps-denom", "denom", "Set FPS denominator")
-			.addFlag("--no-process", "Disable image processing")
-			.addFlag("--no-camera", "Do not specify a camera")
-			.addFlag("--no-udp", "Disable broadcasting UDP")
-			.addFlag("--no-gpio", "Do not specify a gpio pin")
-			.addFlag("--save-diff", "Save the diff image to a file. Requires processor.")
-			.addKvPair("--jpeg-quality", "quality", "Set the JPEG quality to request")
+			.addFlag("--no-server", "Disable the HTTP server.")
+			.addFlag("--version", "Print the version string.")
+			.addKvPair("--udp-target", "address", "Specify the address to broadcast UDP packets to")
+			.alias("--rio-addr", "--udp-target")
+			.addKvPair("--udp-port", "port", "Specify the port to send UDP packets to. Default 5801; a negative port number is equivalent to --no-udp.")
+			.alias("--rio-port", "--udp-port")
+			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
+			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
+			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")
+			.addKvPair("--test", "target", "Run test by name. Tests include 'converter', 'controls', 'client', and 'sse'.")
+			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use. Is ignored if --no-gpio is set")
+			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis when processing sweep 1 (not implemented)")
+			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis when processing sweep 1 (not implemented)")
+			.addKvPair("--width", "px", "Set the width of image to capture/broadcast")
+			.addKvPair("--height", "px", "Set the height of image to capture/broadcast")
+			.addKvPair("--fps-num", "numerator", "Set the FPS numerator. If the camera does not support the set framerate, the closest one available is chosen.")
+			.addKvPair("--fps-denom", "denom", "Set the FPS denominator. If the camera does not support the set framerate, the closest one available is chosen.")
+			.addFlag("--no-process", "Disable image processing.")
+			.addFlag("--no-camera", "Do not specify a camera. This option will cause the program to not invoke v4l4j.")
+			.addFlag("--no-udp", "Disable broadcasting UDP.")
+			.addFlag("--no-gpio", "Disable attaching to a pin. Invoking this option will not invoke WiringPi. Note that the pin is reqired for image processing.")
+			.addFlag("--save-diff", "Save the diff image to a file (./img/delta[#].png). Requires processor.")
+			.addKvPair("--jpeg-quality", "quality", "Set the JPEG quality to request. Must be 1-100")
 			.build();
 		File outputFile = new File("src/resources/parser.ser");
 		if (outputFile.exists())

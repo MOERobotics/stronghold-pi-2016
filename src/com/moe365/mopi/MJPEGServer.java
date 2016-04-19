@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.divisors.projectcuttlefish.httpserver.util.ByteUtils;
 import com.divisors.projectcuttlefish.httpserver.util.ByteUtils.ByteBufferTokenizer;
+import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.PreciseRectangle;
 
 import au.edu.jcu.v4l4j.VideoFrame;
@@ -109,6 +110,7 @@ public class MJPEGServer implements Runnable {
 		this.selector = Selector.open();
 		this.serverSocket = ServerSocketChannel.open();
 		this.serverSocket.configureBlocking(false);
+		this.serverSocket.socket().setReuseAddress(true);
 		this.serverSocket.socket().bind(address);
 		this.serverSocket.register(this.selector, SelectionKey.OP_ACCEPT);
 	}
@@ -199,7 +201,7 @@ public class MJPEGServer implements Runnable {
 		StringBuffer sb = new StringBuffer("event: udrects\r\ndata: [");
 		if (rectangles != null && (!rectangles.isEmpty())) {
 			for (PreciseRectangle rectangle : rectangles) {
-				sb.append('[')
+				sb.append("[0,")
 					.append(rectangle.getX()).append(',')
 					.append(rectangle.getY()).append(',')
 					.append(rectangle.getWidth()).append(',')
@@ -210,6 +212,29 @@ public class MJPEGServer implements Runnable {
 		sb.append("]\r\n\r\n");
 		rectangleWriteBuffer = ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8));
 		areRectanglesAvailable.set(true);
+	}
+	public void offerPolygons(List<Polygon> polygons) {
+		if (jsonSSEChannels.size() == 0)
+			//Don't waste time on building the data, if nobody's there to listen
+			return;
+		StringBuffer sb = new StringBuffer("event: udrects\r\ndata: [");
+		if (polygons != null && (!polygons.isEmpty())) {
+			for (Polygon polygon : polygons) {
+				sb.append("[1,");
+				Polygon.PointNode node = polygon.getStartingPoint();
+				do {
+					sb.append(node.getX()).append(',')
+						.append(node.getY()).append(',');
+				} while (!(node = node.next()).equals(polygon.getStartingPoint()));
+				sb.delete(sb.length() - 1, sb.length())
+					.append("],");
+			}
+			sb.delete(sb.length() - 1, sb.length());
+		}
+		sb.append("]\r\n\r\n");
+		rectangleWriteBuffer = ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8));
+		areRectanglesAvailable.set(true);
+		System.out.println("Pushed polygons");
 	}
 	protected void attemptUpdateSSE() {
 		if (this.jsonSSEChannels.isEmpty() || (!areRectanglesAvailable.get()))

@@ -130,16 +130,25 @@ Content-Type: text/html\r\n
 					updateOverlays(true);
 					for (var i in rectangles) {
 						var rect = rectangles[i];
-						rect[0] *= cvs.width;
-						rect[1] *= cvs.height;
-						rect[2] *= cvs.width;
-						rect[3] *= cvs.height;
 						ctx.strokeStyle = colors[i % colors.length];
 						ctx.beginPath();
-						ctx.moveTo(rect[0], rect[1]);
-						ctx.lineTo(rect[0] + rect[2], rect[1]);
-						ctx.lineTo(rect[0] + rect[2], rect[1] + rect[3]);
-						ctx.lineTo(rect[0], rect[1] + rect[3]);
+						switch (rect[0]) {
+							case 0:
+								rect[1] *= cvs.width;
+								rect[2] *= cvs.height;
+								rect[3] *= cvs.width;
+								rect[4] *= cvs.height;
+								ctx.moveTo(rect[1], rect[2]);
+								ctx.lineTo(rect[1] + rect[3], rect[2]);
+								ctx.lineTo(rect[1] + rect[3], rect[2] + rect[4]);
+								ctx.lineTo(rect[1], rect[3] + rect[4]);
+								break;
+							case 1:
+								ctx.moveTo(rect[1] * cvs.width, rect[2] * cvs.height);
+								for(var j = 3; j < rect.length; j+=2)
+									ctx.lineTo(rect[j] * cvs.width, rect[j + 1] * cvs.height);
+								break;
+						}
 						ctx.closePath();
 						ctx.stroke();
 					}

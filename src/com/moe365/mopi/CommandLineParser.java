@@ -1,5 +1,9 @@
 package com.moe365.mopi;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,7 +16,7 @@ import java.util.stream.Collectors;
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
 
 /**
- * 
+ * Utility class to parse a command line arguments passed to the jar.
  * @author mailmindlin
  */
 public class CommandLineParser implements Serializable, Function<String[], ParsedCommandLineArguments> {
@@ -181,7 +185,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		}
 	}
 	
-	public class CommandLineUsage implements Serializable{
+	public class CommandLineUsage implements Serializable {
 		private static final long serialVersionUID = -1994891773152646790L;
 		//TODO finish
 	}
@@ -195,13 +199,12 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		KV_PAIR
 	}
 	
-	public interface CommandLineToken extends Serializable {
+	public interface CommandLineToken extends Externalizable {
 		String getName();
 		String getDescription();
 		CommandLineTokenType getType();
 	}
 	public static class CommandLineAlias implements CommandLineToken {
-		private static final long serialVersionUID = -9990711714591439L;
 		/**
 		 * Name of alias
 		 */
@@ -238,9 +241,19 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		public CommandLineTokenType getType() {
 			return CommandLineTokenType.ALIAS;
 		}
+
+		@Override
+		public void writeExternal(ObjectOutput out) throws IOException {
+			out.writeUTF(name);
+			out.writeUTF(targetName);
+		}
+		@Override
+		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			name = in.readUTF();
+			targetName = in.readUTF();
+		}
 	}
 	public static class CommandLineFlag implements CommandLineToken {
-		private static final long serialVersionUID = -2592401439122103582L;
 		protected String name;
 		protected String description;
 		public CommandLineFlag() {
@@ -262,9 +275,18 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		public CommandLineTokenType getType() {
 			return CommandLineTokenType.FLAG;
 		}
+		@Override
+		public void writeExternal(ObjectOutput out) throws IOException {
+			out.writeUTF(getName());
+			out.writeUTF(getDescription());
+		}
+		@Override
+		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			name = in.readUTF();
+			description = in.readUTF();
+		}
 	}
 	public static class CommandLineKVPair implements CommandLineToken {
-		private static final long serialVersionUID = -3469591410156229041L;
 		protected String name;
 		protected String fieldName;
 		protected String description;
@@ -293,6 +315,18 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		@Override
 		public CommandLineTokenType getType() {
 			return CommandLineTokenType.KV_PAIR;
+		}
+		@Override
+		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			name = in.readUTF();
+			description = in.readUTF();
+			fieldName = in.readUTF();
+		}
+		@Override
+		public void writeExternal(ObjectOutput out) throws IOException {
+			out.writeUTF(name);
+			out.writeUTF(description);
+			out.writeUTF(fieldName);
 		}
 		
 	}

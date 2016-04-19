@@ -26,27 +26,35 @@ import com.moe365.mopi.geom.PreciseRectangle;
 
 import au.edu.jcu.v4l4j.VideoFrame;
 
+/**
+ * HTTP server used to stream data to web browsers.
+ * @author mailmindlin
+ * @since 0.0.1
+ */
 public class MJPEGServer implements Runnable {
 	/**
-	 * Main HTTP page (HTML)
+	 * Main HTTP page (HTML) bytes
 	 */
 	public static final ByteBuffer HTTP_PAGE_MAIN;
 	/**
-	 * 404 page
+	 * 404 page bytes
 	 */
 	public static final ByteBuffer HTTP_PAGE_404;
 	/**
-	 * MJPEG header (sent at the top of the response)
+	 * MJPEG header (sent at the top of the response) bytes
 	 */
 	public static final ByteBuffer HTTP_HEAD_MJPEG;
 	/**
-	 * MJPEG frame header (sent before each frame)
+	 * MJPEG frame header (sent before each frame) bytes
 	 */
 	public static final ByteBuffer HTTP_FRAME_MJPEG;
 	/**
-	 * A generic 200 OK response
+	 * Generic 200 OK response bytes
 	 */
 	public static final ByteBuffer HTTP_PAGE_200;
+	/**
+	 * SSE header (sent at the top of the response) bytes.
+	 */
 	public static final ByteBuffer HTTP_SSE_HEAD;
 	
 	static {

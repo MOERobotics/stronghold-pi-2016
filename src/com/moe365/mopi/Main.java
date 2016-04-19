@@ -63,7 +63,7 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.1.9-alpha";
+	public static final String version = "0.1.10-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -437,7 +437,6 @@ public class Main {
 			.addFlag("--out", "Specify where to write log messages to (not implemented)")
 			.addKvPair("--port", "port", "Specify the port for the HTTP server to listen on. Default 5800; a negative port number is equivalent to --no-server")
 			.alias("-p", "--port")
-			.addFlag("--no-server", "Disable the HTTP server.")
 			.addFlag("--version", "Print the version string.")
 			.addKvPair("--udp-target", "address", "Specify the address to broadcast UDP packets to")
 			.alias("--rio-addr", "--udp-target")
@@ -454,6 +453,7 @@ public class Main {
 			.addKvPair("--height", "px", "Set the height of image to capture/broadcast")
 			.addKvPair("--fps-num", "numerator", "Set the FPS numerator. If the camera does not support the set framerate, the closest one available is chosen.")
 			.addKvPair("--fps-denom", "denom", "Set the FPS denominator. If the camera does not support the set framerate, the closest one available is chosen.")
+			.addFlag("--no-server", "Disable the HTTP server.")
 			.addFlag("--no-process", "Disable image processing.")
 			.addFlag("--no-camera", "Do not specify a camera. This option will cause the program to not invoke v4l4j.")
 			.addFlag("--no-udp", "Disable broadcasting UDP.")

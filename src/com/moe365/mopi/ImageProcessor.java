@@ -4,7 +4,6 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -24,7 +23,8 @@ public class ImageProcessor implements Runnable {
 	public static byte saturateByte(int num) {
 		return (num > 0xFF) ? ((byte)0xFF) : ((num < 0) ? 0 : ((byte)num));
 	}
-	public static void split(int px, int[] buf) {
+	
+	public static void splitRGB(int px, int[] buf) {
 		buf[0] = (px >>> 16) & 0xFF;
 		buf[1] = (px >> 8) & 0xFF;
 		buf[2] = px & 0xFF;
@@ -51,7 +51,6 @@ public class ImageProcessor implements Runnable {
 	BufferedImage img;
 	AtomicInteger i = new AtomicInteger(0);
 	Thread thread;
-	public AtomicReference<List<Rectangle>> lastResult = new AtomicReference<>(Collections.emptyList());
 	public ImageProcessor(int width, int height, RoboRioClient client) {
 		this.width = width;
 		this.height = height;
@@ -173,8 +172,8 @@ public class ImageProcessor implements Runnable {
 				if (processed[y][x])
 					continue;
 				processed[y][x] = true;
-				split(on.getRGB(x, y), pxOn);
-				split(off.getRGB(x, y), pxOff);
+				splitRGB(on.getRGB(x, y), pxOn);
+				splitRGB(off.getRGB(x, y), pxOff);
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
@@ -248,8 +247,8 @@ public class ImageProcessor implements Runnable {
 				if (processed[y][x])
 					continue;
 				processed[y][x] = true;
-				split(on.getRGB(x, y), pxOn);
-				split(off.getRGB(x, y), pxOff);
+				splitRGB(on.getRGB(x, y), pxOn);
+				splitRGB(off.getRGB(x, y), pxOff);
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];

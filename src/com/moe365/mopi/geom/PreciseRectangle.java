@@ -15,8 +15,7 @@ import com.moe365.mopi.util.ReflectionUtils;
  * @since April 2016
  * @author mailmindlin
  */
-public class PreciseRectangle implements Serializable {
-	private static final long serialVersionUID = -4055498917888653239L;
+public class PreciseRectangle implements Externalizable {
 	protected final double x, y, width, height;
 	protected transient int hash;
 	/**
@@ -111,5 +110,23 @@ public class PreciseRectangle implements Serializable {
 			hash = buf.hashCode();
 		}
 		return hash;
+	}
+	@Override
+	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+		try {
+			ReflectionUtils.setDouble(this, "x", in.readDouble());
+			ReflectionUtils.setDouble(this, "y", in.readDouble());
+			ReflectionUtils.setDouble(this, "width", in.readDouble());
+			ReflectionUtils.setDouble(this, "height", in.readDouble());
+		} catch (NoSuchFieldException | IllegalArgumentException | IllegalAccessException e) {
+			throw new IOException("Unable to update fields", e);
+		}
+	}
+	@Override
+	public void writeExternal(ObjectOutput out) throws IOException {
+		out.writeDouble(getX());
+		out.writeDouble(getY());
+		out.writeDouble(getWidth());
+		out.writeDouble(getHeight());
 	}
 }

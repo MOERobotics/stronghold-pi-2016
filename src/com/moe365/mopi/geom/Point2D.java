@@ -1,6 +1,5 @@
 package com.moe365.mopi.geom;
 
-public class Point2D {
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -12,6 +11,7 @@ import com.moe365.mopi.util.ReflectionUtils;
  * 
  * @author mailmindlin
  */
+public class Point2D implements Externalizable, Cloneable {
 	protected final double x;
 	protected final double y;
 
@@ -119,5 +119,21 @@ import com.moe365.mopi.util.ReflectionUtils;
 			return otherPt.getX() == getX() && otherPt.getY() == getY();
 		}
 		return false;
+	}
+
+	@Override
+	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+		try {
+			ReflectionUtils.setDouble(this, "x", in.readDouble());
+			ReflectionUtils.setDouble(this, "y", in.readDouble());
+		} catch (NoSuchFieldException | IllegalArgumentException | IllegalAccessException e) {
+			throw new IOException("Unable to set field", e);
+		}
+	}
+
+	@Override
+	public void writeExternal(ObjectOutput out) throws IOException {
+		out.writeDouble(this.x);
+		out.writeDouble(this.y);
 	}
 }

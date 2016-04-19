@@ -63,7 +63,7 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.2.0-alpha";
+	public static final String version = "0.2.1-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;

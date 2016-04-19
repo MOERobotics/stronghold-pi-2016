@@ -1,12 +1,17 @@
 package com.moe365.mopi.geom;
 
 import java.awt.Rectangle;
-import java.io.Serializable;
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
 
+import com.moe365.mopi.util.ReflectionUtils;
+
 /**
- * Like a Rectangle, but immutable, and double precision
+ * Like a Rectangle, but immutable, and double precision.
  * @since April 2016
  * @author mailmindlin
  */
@@ -30,18 +35,34 @@ public class PreciseRectangle implements Serializable {
 		this.height = height;
 	}
 	
+	/**
+	 * Get the left offset for this rectangle
+	 * @return the X coordinate of the top-left corner
+	 */
 	public double getX() {
 		return this.x;
 	}
 	
+	/**
+	 * Get the top offset for this rectangle
+	 * @return the Y coordinate of the top-left corner
+	 */
 	public double getY() {
 		return this.y;
 	}
 	
+	/**
+	 * Get the width of the rectangle
+	 * @return the width
+	 */
 	public double getWidth() {
 		return this.width;
 	}
 	
+	/**
+	 * Get this rectangle's height
+	 * @return the height
+	 */
 	public double getHeight() {
 		return this.height;
 	}
@@ -50,10 +71,24 @@ public class PreciseRectangle implements Serializable {
 		return width * height;
 	}
 	
+	/**
+	 * Scale the width and height by a given factor. The top-left corner
+	 * is not changed.
+	 * @param factor the factor by which to scale
+	 * @return the scaled rectangle
+	 */
 	public PreciseRectangle scale(double factor) {
 		return new PreciseRectangle(x, y, width * factor, height * factor);
 	}
 	
+	/**
+	 * Scale all coordinates by the given value.
+	 * @param xf factor for the X coordinate
+	 * @param yf factor for the Y coordinate
+	 * @param wf factor for the width
+	 * @param hf factor for the height
+	 * @return scaled rectangle
+	 */
 	public PreciseRectangle scale(double xf, double yf, double wf, double hf) {
 		return new PreciseRectangle(x * xf, y * yf, width * wf, height * hf);
 	}

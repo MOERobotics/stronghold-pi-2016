@@ -63,7 +63,7 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
-	public static final String version = "0.1.10-alpha";
+	public static final String version = "0.2.0-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -258,15 +258,19 @@ public class Main {
 	 */
 	protected static GpioPinDigitalOutput initGpio(ParsedCommandLineArguments args) {
 		if (args.isFlagSet("--no-gpio"))
+			//GPIO is disabled, so return null
 			return null;
+		//Get the GPIO object
 		final GpioController gpio = GpioFactory.getInstance();
 		GpioPinDigitalOutput pin;
 		if (args.isFlagSet("--gpio-pin")) {
+			//Get the GPIO pin by name
 			String pinName = args.get("--gpio-pin");
 			if (!pinName.startsWith("GPIO ") && pinName.matches("\\d+"))
 				pinName = "GPIO " + pinName.trim();
 			pin = gpio.provisionDigitalOutputPin(RaspiPin.getPinByName(pinName), "LED pin", PinState.LOW);
 		} else {
+			//Get the GPIO_01 pin 
 			pin = gpio.provisionDigitalOutputPin(RaspiPin.GPIO_01, "LED pin", PinState.LOW);
 		}
 		System.out.println("Using GPIO pin " + pin.getPin());
@@ -277,10 +281,10 @@ public class Main {
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args) throws SocketException {
 		if (args.isFlagSet("--no-udp"))
 			return null;
-		int port = args.getOrDefault("--rio-port", RoboRioClient.RIO_PORT);
+		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
 		if (port < 0)
 			return null;
-		String address = args.getOrDefault("--rio-addr", RoboRioClient.RIO_ADDRESS);
+		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		InetSocketAddress addr = new InetSocketAddress(address, port);
 		return new RoboRioClient(port, addr);

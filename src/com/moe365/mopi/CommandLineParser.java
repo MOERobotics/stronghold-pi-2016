@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
 
 /**
- * 
+ * Utility class to parse a command line arguments passed to the jar.
  * @author mailmindlin
  */
 public class CommandLineParser implements Serializable, Function<String[], ParsedCommandLineArguments> {

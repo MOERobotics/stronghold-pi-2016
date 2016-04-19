@@ -20,10 +20,20 @@ import au.edu.jcu.v4l4j.VideoFrame;
 public class ImageProcessor implements Runnable {
 	public static final int step = 1, tolerance = 70;
 	
+	/**
+	 * Convert an integer to a byte by saturating it in <code>[0, 255]</code>.
+	 * @param num the number to saturate
+	 * @return the saturated byte
+	 */
 	public static byte saturateByte(int num) {
 		return (num > 0xFF) ? ((byte)0xFF) : ((num < 0) ? 0 : ((byte)num));
 	}
 	
+	/**
+	 * Split a RGB(A)32 pixel into its RGB component parts
+	 * @param px the RGB(A)32 pixel
+	 * @param buf an array of size >= 3, for storing the channels
+	 */
 	public static void splitRGB(int px, int[] buf) {
 		buf[0] = (px >>> 16) & 0xFF;
 		buf[1] = (px >> 8) & 0xFF;
@@ -68,6 +78,10 @@ public class ImageProcessor implements Runnable {
 		this.thread = new Thread(this);
 		thread.setName("ProcessorThread-" + thread.getId());
 	}
+	/**
+	 * Start the processor thread
+	 * @return self
+	 */
 	public ImageProcessor start() {
 		thread.start();
 		return this;

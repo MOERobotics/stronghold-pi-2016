@@ -1,12 +1,25 @@
 package com.moe365.mopi.geom;
 
 import java.awt.Rectangle;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
 
-public class PreciseRectangle {
+/**
+ * Like a Rectangle, but immutable, and double precision
+ * @since April 2016
+ * @author mailmindlin
+ */
+public class PreciseRectangle implements Serializable {
+	private static final long serialVersionUID = -4055498917888653239L;
 	protected final double x, y, width, height;
-	protected int hash;
+	protected transient int hash;
+	/**
+	 * For deserializing
+	 */
+	protected PreciseRectangle() {
+		this(0,0,0,0);
+	}
 	public PreciseRectangle(Rectangle rect) {
 		this(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
 	}

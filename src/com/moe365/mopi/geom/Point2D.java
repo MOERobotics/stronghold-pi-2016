@@ -1,31 +1,77 @@
 package com.moe365.mopi.geom;
 
 public class Point2D {
-	public int x;
-	public int y;
+	protected final double x;
+	protected final double y;
 
 	public Point2D() {
-
+		this(0, 0);
 	}
 
-	public Point2D(int x, int y) {
+	public Point2D(double x, double y) {
 		this.x = x;
 		this.y = y;
 	}
 	
+	public double getX() {
+		return x;
+	}
+	public double getY() {
+		return y;
+	}
+	
 	public Point2D subtract(Point2D other) {
-		return new Point2D(this.x - other.x, this.y - other.y);
+		return new Point2D(getX() - other.getX(), getY() - other.getY());
 	}
 	
 	public Point2D abs() {
-		return new Point2D(Math.abs(x), Math.abs(y));
+		return new Point2D(Math.abs(getX()), Math.abs(getY()));
 	}
 	
-	public float getSlopeTo(Point2D other) {
-		return ((float)(other.y - this.y)) / ((float)(other.x - this.x));
+	public double getSlopeTo(Point2D other) {
+		return (other.getY() - getY()) / (other.getX() - getX());
 	}
 	
-	public Point2D getTaxicabCenter(Point2D other) {
-		return new Point2D((this.x + other.x) / 2, (this.y + other.y) / 2);
+	public Point2D getMidpoint(Point2D other) {
+		return new Point2D(.5 * (getX() + other.getX()), .5 * (getY() + other.getY()));
+	}
+	public Point2D getMidpointOffset(Point2D other) {
+		return new Point2D(.5 * (other.getX() - getX()), .5 * (other.getY() - getY()));
+	}
+	/**
+	 * Essentially <code>{@link #getDistance(Point2D)}^2</code>. Because this method does not require a square root operation,
+	 * it is much faster.
+	 * @param other
+	 * @return distance squared
+	 */
+	public double getDistanceSquared(Point2D other) {
+		return Math.pow(getX() - other.getX(), 2) + Math.pow(getY() - other.getY(), 2);
+	}
+	/**
+	 * Pythagorean calculation of distance
+	 * @param other
+	 * @return distance
+	 */
+	public double getDistance(Point2D other) {
+		return Math.sqrt(getDistanceSquared(other));
+	}
+	public double getTaxicabDistance(Point2D other) {
+		return Math.abs(getX() - other.getX()) + Math.abs(getY() - other.getY());
+	}
+	@Override
+	public String toString() {
+		return new StringBuilder("[x:").append(String.format("%.2f", getX()))
+			.append(",y:").append(String.format("%.2f", getY())).append(']')
+			.toString();
+	}
+	@Override
+	public boolean equals(Object other) {
+		if (this == other)
+			return true;
+		if (other instanceof Point2D) {
+			Point2D otherPt = (Point2D) other;
+			return otherPt.getX() == getX() && otherPt.getY() == getY();
+		}
+		return false;
 	}
 }

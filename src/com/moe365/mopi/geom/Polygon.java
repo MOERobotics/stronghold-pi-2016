@@ -1,31 +1,28 @@
 package com.moe365.mopi.geom;
 
-import java.awt.Point;
-
 public class Polygon {
 	PointNode start;
-	public PointNode startAt(int x, int y) {
-		return start = new PointNode(x, y);
+	public PointNode startAt(double x, double y) {
+		start = new PointNode(x, y);
+		start.next = start;
+		start.prev = start;
+		return start;
 	}
 	public class PointNode extends Point2D {
-		public PointNode next;
-		public PointNode prev;
+		protected PointNode next;
+		protected PointNode prev;
 		public PointNode() {
 			
 		}
-		public PointNode(int x, int y) {
-			this.x = x;
-			this.y = y;
+		public PointNode(double x, double y) {
+			super(x, y);
 		}
-		public PointNode(PointNode prev, int x, int y) {
+		public PointNode(PointNode prev, double x, double y) {
+			this(x, y);
 			this.prev = prev;
-			this.x = x;
-			this.y = y;
 		}
-		public PointNode(PointNode prev, int x, int y, PointNode next) {
-			this.prev = prev;
-			this.x = x;
-			this.y = y;
+		public PointNode(PointNode prev, double x, double y, PointNode next) {
+			this(prev, x, y);
 			this.next = next;
 		}
 		public PointNode next() {
@@ -36,29 +33,75 @@ public class Polygon {
 				return this;
 			return next;
 		}
-		public PointNode insertNext(int x, int y) {
+		public PointNode insertNext(double x, double y) {
 			PointNode node = new PointNode(this, x, y, this.next);
 			this.next.prev = node;
 			this.next = node;
-			return this;
+			return node;
 		}
 		public PointNode insertNext(PointNode node) {
 			this.next.prev = node;
+			node.next = this.next;
 			this.next = node;
-			return this;
+			node.prev = this;
+			return node;
+		}
+		public PointNode insertBefore(double x, double y) {
+			PointNode node = new PointNode(this.prev, x, y, this);
+			this.prev.next = node;
+			this.prev = node;
+			return node;
+		}
+		public PointNode insertBefore(PointNode node) {
+			this.prev.next = node;
+			node.prev = this.prev;
+			this.prev = node;
+			node.next = this;
+			return node;
 		}
 		public PointNode removeNext() {
-			this.next = this.next.next;
-			this.next.prev = this;
+			next.remove();
 			return this;
 		}
+		public PointNode remove() {
+			this.prev.next = this.next;
+			this.next.prev = this.prev;
+			if (this == start)
+				start = this.next;
+			return this.next;
+		}
+		public PointNode set(double x, double y) {
+			PointNode node = new PointNode(this.prev, x, y, this.next);
+			this.prev.next = node;
+			this.next.prev = node;
+			if (start == this)
+				start = node;
+			return node;
+		}
 	}
-	public void addPoint(int leftX, int y) {
-		// TODO Auto-generated method stub
-		
+	public void addPoint(double x, double y) {
+		start.insertBefore(x, y);
 	}
-	public Point getStartingPoint() {
-		// TODO Auto-generated method stub
-		return null;
+	public double getArea() {
+		double sum = 0.0;
+		PointNode current = start;
+		PointNode next = current.next();
+		do
+			sum += (current.getX() * next.getY() - current.getY() * next.getY());
+		while ((current = next) != null && (next = next.nextIfNotNull()) != start);
+		return sum * .5;
+	}
+	public PointNode getStartingPoint() {
+		return start;
+	}
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder("[");
+		PointNode node = start;
+		do
+			sb.append(node).append(',');
+		while ((node = node.next()) != start);
+		sb.append(node).append(']');
+		return sb.toString();
 	}
 }

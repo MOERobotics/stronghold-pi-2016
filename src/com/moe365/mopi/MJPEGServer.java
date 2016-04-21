@@ -284,6 +284,7 @@ public class MJPEGServer implements Runnable {
 					continue;
 				}
 				try {
+					jpegWriteBuffer.rewind();
 					if (channel.write(HTTP_FRAME_MJPEG.duplicate()) < 0 || channel.write(jpegWriteBuffer) < 0)
 						this.mjpegChannels.remove(id);
 				} catch (IOException e) {

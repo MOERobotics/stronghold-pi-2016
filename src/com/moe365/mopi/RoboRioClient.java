@@ -140,8 +140,8 @@ public class RoboRioClient implements Closeable, Runnable {
 	}
 	public void writeOneFound(double left, double top, double width, double height) throws IOException {
 		build(STATUS_ONE_FOUND, (short) 0);
-		buffer.putDouble(top);
 		buffer.putDouble(left);
+		buffer.putDouble(top);
 		buffer.putDouble(width);
 		buffer.putDouble(height);
 		socket.send(packet_40);

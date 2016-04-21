@@ -29,7 +29,7 @@ public class BoundingBoxThing {
  * @param  boundYmin  location of valid top edge of box (-1 if none)
  * @param  boundYmax  location of valid bottom edge of box (-1 if none)
  * @return      if there are any bounding boxes
- * @see         
+ * @see   Rectangle      
  */
 	public static boolean boundingBoxRecursive(boolean[][] img, List<Rectangle> bbr, int limXmin, int limXmax,
 			int limYmin, int limYmax, int boundXmin, int boundXmax, int boundYmin, int boundYmax) {

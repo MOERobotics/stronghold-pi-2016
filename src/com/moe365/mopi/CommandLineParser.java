@@ -214,7 +214,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		 */
 		protected String targetName;
 		
-		protected CommandLineAlias() {
+		public CommandLineAlias() {
 			
 		}
 		
@@ -290,7 +290,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		protected String name;
 		protected String fieldName;
 		protected String description;
-		protected CommandLineKVPair() {
+		public CommandLineKVPair() {
 			
 		}
 		public CommandLineKVPair(String name, String fieldName, String description) {

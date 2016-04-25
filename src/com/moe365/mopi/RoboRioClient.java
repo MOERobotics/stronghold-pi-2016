@@ -46,7 +46,7 @@ import com.moe365.mopi.geom.PreciseRectangle;
  * 
  * @author mailmindlin
  */
-public class RoboRioClient implements Closeable, Runnable {
+public class RoboRioClient implements Closeable {
 	public static final int RIO_PORT = 5801;
 	public static final int BUFFER_SIZE = 72;
 	public static final String RIO_ADDRESS = "roboRIO-365-FRC.local";
@@ -168,14 +168,6 @@ public class RoboRioClient implements Closeable, Runnable {
 	}
 	@Override
 	public void close() throws IOException {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void run() {
-		while (!Thread.interrupted()) {
-
-		}
+		socket.close();
 	}
 }

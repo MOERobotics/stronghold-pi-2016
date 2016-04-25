@@ -2,6 +2,7 @@ package com.moe365.mopi.util;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.function.Consumer;
 
 /**
  * Utility for reflections, most used for implementing Externalizable.
@@ -19,6 +20,10 @@ public class ReflectionUtils {
 			e.printStackTrace();
 		}
 		modifiersField = tmp;
+	}
+	@FunctionalInterface
+	protected static interface FieldOperator {
+		void apply(Field field) throws IllegalAccessException;
 	}
 
 	/**
@@ -41,12 +46,27 @@ public class ReflectionUtils {
 	 */
 	public static void setDouble(Object obj, String fieldName, double value)
 			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+		applyOnField(obj.getClass(), fieldName, field->field.setDouble(obj, value));
+	}
+	public static void setInt(Object obj, String fieldName, int value)
+			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+		applyOnField(obj.getClass(), fieldName, field->field.setInt(obj, value));
+	}
+	public static void setFloat(Object obj, String fieldName, float value)
+			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+		applyOnField(obj.getClass(), fieldName, field->field.setFloat(obj, value));
+	}
+	public static void setLong(Object obj, String fieldName, long value)
+			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+		applyOnField(obj.getClass(), fieldName, field->field.setLong(obj, value));
+	}
+	public static void applyOnField(Class<?> clazz, String fieldName, FieldOperator action) throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
 		Field field;
 		try {
-			field = obj.getClass().getField(fieldName);
+			field = clazz.getField(fieldName);
 		} catch (NoSuchFieldException e) {
 			try {
-				field = obj.getClass().getDeclaredField(fieldName);
+				field = clazz.getDeclaredField(fieldName);
 			} catch (NoSuchFieldException e1) {
 				throw e1;
 			}
@@ -57,7 +77,7 @@ public class ReflectionUtils {
 		try {
 			field.setAccessible(true);
 			modifiersField.setInt(field, modifiers & ~Modifier.FINAL);
-			field.setDouble(obj, value);
+			action.apply(field);
 		} finally {
 			if (field.isAccessible() ^ wasAccessible)
 				field.setAccessible(wasAccessible);

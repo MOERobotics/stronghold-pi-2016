@@ -1,5 +1,5 @@
 # MOE 365 FRC Stronghold Raspberry Pi Code
-<table><tr><th colspan=2>Stronghold 2016 Code</th></tr><tr><td><a href="github.com/MOERobotics/2016Stronghold-CaMOElot">RoboRio</a></td><td>Raspberry Pi</td></tr></table>
+<table><tr><th colspan=2>Stronghold 2016 Code</th></tr><tr><td><a href="https://github.com/MOERobotics/2016Stronghold-CaMOElot">RoboRio</a></td><td>Raspberry Pi</td></tr></table>
 Raspberry Pi code for FRC stronghold challenge.
 
 # Details

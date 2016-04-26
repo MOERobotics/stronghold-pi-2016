@@ -91,6 +91,27 @@ public class Polygon {
 		while ((current = next) != null && (next = next.nextIfNotNull()) != start);
 		return sum * .5;
 	}
+	/**
+	 * Convert this rectangle to a bounding box
+	 * @return bounding box
+	 */
+	public PreciseRectangle getBoundingBox() {
+		double minX = start.getX(), maxX = minX;
+		double minY = start.getY(), maxY = minY;
+		PointNode node = start;
+		while (!(node = node.next()).equals(start)) {
+			if (node.getX() < minX)
+				minX = node.getX();
+			else if (node.getX() > maxX)
+				maxX = node.getX();
+			
+			if (node.getY() < minY)
+				minY = node.getY();
+			else if (node.getY() > maxY)
+				maxY = node.getY();
+		}
+		return new PreciseRectangle(minX, minY, maxX - minX, maxY - minY);
+	}
 	public PointNode getStartingPoint() {
 		return start;
 	}

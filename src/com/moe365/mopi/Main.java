@@ -305,7 +305,14 @@ public class Main {
 		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		InetSocketAddress addr = new InetSocketAddress(address, port);
-		return new RoboRioClient(port, addr);
+		try {
+			return new RoboRioClient(port, addr);
+		} catch (IOException e) {
+			//restrict scope of broken stuff
+			e.printStackTrace();
+			System.err.println("CLIENT DISABLED");
+			return null;
+		}
 	}
 	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
 		if (args.isFlagSet("--no-process"))

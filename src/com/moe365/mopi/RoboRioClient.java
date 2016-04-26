@@ -128,22 +128,38 @@ public class RoboRioClient implements Closeable {
 	 * @throws SocketException 
 	 * @throws IOException 
 	 */
-	public RoboRioClient() throws SocketException {
+	public RoboRioClient() throws SocketException, IOException {
 		this(RIO_PORT, BUFFER_SIZE, new InetSocketAddress(RIO_ADDRESS, RIO_PORT));
 	}
-	public RoboRioClient(int port, SocketAddress addr) throws SocketException {
+	public RoboRioClient(int port, SocketAddress addr) throws SocketException, IOException {
 		this(port, BUFFER_SIZE, addr);
 	}
-	public RoboRioClient(int port, int buffSize, SocketAddress addr) throws SocketException {
+	/**
+	 * 
+	 * @param port
+	 * @param buffSize
+	 * @param addr
+	 * @throws SocketException if the socket could not be opened, or the socket could not bind to the specified local port.
+	 * @throws IOException 
+	 */
+	public RoboRioClient(int port, int buffSize, SocketAddress addr) throws SocketException, IOException {
 		this.port = port;
 		this.address = addr;
 		this.buffer = ByteBuffer.allocate(buffSize);
 		System.out.println("Connecting to RIO: " + port + " | " + addr);
 		this.socket = new DatagramSocket(port);
-		socket.setTrafficClass(0x10);//Low delay
-		this.packet_8 = new DatagramPacket(buffer.array(), 0, 8, address);
-		this.packet_40 = new DatagramPacket(buffer.array(), 0, 40, address);
-		this.packet_72 = new DatagramPacket(buffer.array(), 0, 72, address);
+		try {
+			socket.setTrafficClass(0x10);//Low delay
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
+		try {
+			this.packet_8 = new DatagramPacket(buffer.array(), 0, 8, address);
+			this.packet_40 = new DatagramPacket(buffer.array(), 0, 40, address);
+			this.packet_72 = new DatagramPacket(buffer.array(), 0, 72, address);
+		} catch (IllegalArgumentException e) {
+			throw new IOException("Error resolving address", e);
+		}
 	}
 	protected void build(short status, short ack) {
 		buffer.position(0);

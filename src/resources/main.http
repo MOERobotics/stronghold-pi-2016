@@ -60,14 +60,14 @@ Content-Type: text/html\r\n
 	<body>
 		<img src="stream.jpg"/>
 		<canvas></canvas>
-		<button id="popup-button" onclick="window.open(document.URL+'#is_popup','_blank','height=240,width=320,chrome=yes,scrollbars=yes,status=no,menubar=no,toolbar=no,location=no')">F</button>
+		<button id="popup-button" onclick="window.open(document.URL+'#popup','_blank','height=240,width=320,chrome=yes,scrollbars=yes,status=no,menubar=no,toolbar=no,location=no')">F</button>
 		<span class="lock-label locked"></span>
 		<span class="cv-label cmpvision"></span>
 		
 		<script type="application/javascript">
 			'use strict';
 			var $_ = document.querySelector.bind(document);
-			if (window.location.hash.indexOf('is_popup') >= 0)
+			if (window.location.hash.indexOf('popup')>=0)
 				$_('#popup-button').remove();
 			var colors = ['#F00','#0F0','#00F','#FF0','#F0F','#0FF','purple','orange','pink','grey','chartreuse'];
 			var cvs = $_('canvas');

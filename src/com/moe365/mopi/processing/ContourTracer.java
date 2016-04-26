@@ -1,87 +1,265 @@
 package com.moe365.mopi.processing;
 
+import java.awt.image.BufferedImage;
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.function.Consumer;
 
-public class ContourTracer implements Consumer<BinaryImage> {
-	protected final int width;
-	protected final int height;
-	protected int minWidth = 10;
-	protected int minHeight = 10;
+import com.moe365.mopi.geom.Polygon;
+import com.moe365.mopi.geom.Polygon.PointNode;
+
+import au.edu.jcu.v4l4j.VideoFrame;
+
+public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
+	protected int minBlobWidth = 10;
+	protected int minBlobHeight = 10;
+	protected double maxSegmentLength = 8.0;
+	protected double stepSize = 4.0;
+	public static final int minGreenTolerance = 70;
+	public static final int maxRedTolerance = 70;
 	public ContourTracer(int width, int height) throws IllegalArgumentException {
-		if (width <= 0)
-			throw new IllegalArgumentException("Invalid width (expect: width > 0; width = " + width ")");
-		if (height <= 0)
-			throw new IllegalArgumentException("Invalid height (expect: height > 0; height = " + height + ")");
-		this.width = width;
-		this.height = height;
+		this(width, height, null);
+	}
+	public ContourTracer(int width, int height, Consumer<List<Polygon>> handler) {
+		super(0, 0, width, height, handler);
+		System.out.println("W: " + width + "\tH: " + height);
+	}
+	
+	public ContourTracer(ContourTracerParams params, Consumer<List<Polygon>> handler) {
+		super(params.getFrameMinX(), params.getFrameMinY(), params.getFrameMaxX(), params.getFrameMaxY(), handler);
 	}
 	@Override
-	public void accept(BinaryImage image) {
+	public List<Polygon> apply(VideoFrame frameOn, VideoFrame frameOff) {
+		BufferedImage imgOn = frameOn.getBufferedImage();
+		BufferedImage imgOff = frameOff.getBufferedImage();
+		final boolean[][] processed = new boolean[getFrameHeight()][getFrameWidth()];
+		final boolean[][] cache = new boolean[getFrameHeight()][getFrameWidth()];
+		List<Polygon> result = tracePass1((x, y) -> {
+			if (processed[y][x])
+				return cache[y][x];
+			processed[y][x] = true;
+			int pxOn  = imgOn.getRGB(x, y);
+			int pxOff = imgOff.getRGB(x, y);
+			return cache[y][x] = ((pxOn >> 8) & 0xFF) - ((pxOff >> 8) & 0xFF) > minGreenTolerance && ((pxOn >> 16) & 0xFF) - ((pxOff >> 16) & 0xFF) < maxRedTolerance;
+		});
+		return result;
+	}
+	
+	protected List<Polygon> tracePass1(BinaryImage image) {
 		List<Polygon> blobs = new LinkedList<Polygon>();
-		for (int y = minHeight; y < height - minHeight; y+= minHeight) {
-			for (int x = minWidth; x < width - minWidth; x+= minWidth) {
+		for (int y = frameMinY + minBlobHeight; y < frameMaxY - minBlobHeight; y+= minBlobHeight) {
+			for (int x = frameMinX + minBlobWidth + ((y % (2 * minBlobHeight) == 0) ? minBlobWidth/2 : 0); x < frameMaxX - minBlobWidth; x+= minBlobWidth) {
 				if (image.test(x, y)) {
 					Polygon blob = new Polygon();
 					int topY, bottomY, leftX, rightX;
-					for (leftX = x; leftX > 0 && image.test(leftX, y); leftX--);
-					blob.addPoint(leftX, y);
-					for (topY = y; topY > 0 && image.test(x, topY); topY--);
-					blob.addPoint(x, topY);
-					for (rightX = x; rightX < width && image.test(rightX, y); rightX++);
-					blob.addPoint(rightX, y);
-					for (bottomY = y; bottomY < height && image.test(x, bottomY); bottomY);
-					blob.addPoint(x, bottomY);
-					
-					this.tracePass2(blob);
+					for (leftX = x; leftX > frameMinX && image.test(leftX, y); leftX--);
+					blob.startAt(++leftX, y);
+					for (topY = y; topY > frameMinY && image.test(x, topY); topY--);
+					blob.addPoint(x, ++topY);
+					for (rightX = x; rightX < frameMaxX && image.test(rightX, y); rightX++);
+					blob.addPoint(--rightX, y);
+					for (bottomY = y; bottomY < frameMaxY && image.test(x, bottomY); bottomY++);
+					blob.addPoint(x, --bottomY);
+					tracePass2(image, blob);
+					tracePass3(blob);
+					blobs.add(blob);
 				}
 			}
 		}
+		return blobs;
 	}
+	/**
+	 * Pass2 fills out the polygon.
+	 * @param image
+	 * @param blob
+	 */
 	protected void tracePass2(BinaryImage image, Polygon blob) {
-		final Point startingPoint = blob.getStartingPoint();
-		Point pointA = startingPoint, pointB = pointA.next();
-		do {
-			double midpointOffsetX = .5 * (pointB.getX() - pointA.getX());
-			double midpointOffsetY = .5 * (pointB.getY() - pointA.getY());
-			if (Math.sqrt(midpointOffsetX * midpointOffsetX + midpointOffsetY * midpointOffsetY) < .5)
-				continue;//point A and B are <1 px apart
-			
-			double midpointX = pointA.getX() + midpointOffsetX;
-			double midpointY = pointA.getY() + midpointOffsetY;
-			boolean midpointValue = image.test(midpointX, midpointY);
-			if (midpointOffsetY == 0) {
-				if ((midpointOffsetX > 0) == midpointValue) {
-					while (midpointY >= 0 && image.test(midpointX, midpointY) == midpointValue)
-						midpointY--;
-					midpointY++;
-				} else {
-					while (midpointY <= height && image.test(midpointX, midpointY) == midpointValue)
+		System.out.println("Pass2: " + blob);
+		final PointNode startingPoint = blob.getStartingPoint();
+		PointNode pointA = startingPoint, pointB = pointA.next();
+		while (true) {
+//			System.out.print(pointA.toString() + "/" + pointB.toString() + ":\t");
+			// Use distance^2, because x^2 < r^2 if x < r, and x^2 > r^2 if x > r, and it's faster, because no sqrt operations.
+			if (pointA.equals(pointB)) {
+				pointA.removeNext();
+//				System.out.println("R");
+			} else if (pointA.getDistanceSquared(pointB) > maxSegmentLength * maxSegmentLength) {
+				// point A and B are >r px apart
+				
+				double midpointOffsetX = .5 * (pointB.getX() - pointA.getX());
+				double midpointOffsetY = .5 * (pointB.getY() - pointA.getY());
+				
+				double midpointX = pointA.getX() + midpointOffsetX;
+				double midpointY = pointA.getY() + midpointOffsetY;
+				boolean midpointValue = image.test(midpointX, midpointY);
+				if (midpointOffsetY == 0) {
+					if ((midpointOffsetX > 0) == midpointValue) {
+						while (midpointY >= frameMinY && image.test(midpointX, midpointY) == midpointValue)
+							midpointY--;
 						midpointY++;
-					midpointY--;
-				}
-			} else if (midpointOffsetX == 0) {
-				if ((midpointOffsetY > 0) == midpointValue) {
-					while (midpointX >= 0 && image.test(midpointX, midpointY) == midpointValue)
-						midpointX--;
-					midpointX++;
-				} else {
-					while (midpointX <= height && image.test(midpointX, midpointY) == midpointValue)
+					} else {
+						while (midpointY < frameMaxY && image.test(midpointX, midpointY) == midpointValue)
+							midpointY++;
+						midpointY--;
+					}
+				} else if (midpointOffsetX == 0) {
+					if ((midpointOffsetY > 0) == midpointValue) {
+						while (midpointX >= frameMinX && image.test(midpointX, midpointY) == midpointValue)
+							midpointX--;
+						//Take a step backwards
 						midpointX++;
-					midpointX--;
+					} else {
+						while ((midpointX + .5 < frameMaxX) && image.test(midpointX, midpointY) == midpointValue)
+							midpointX++;
+						//Take a step backwards
+						midpointX--;
+					}
+				} else {
+					final double invSlope = Math.abs(midpointOffsetX / midpointOffsetY);
+					double stepX = stepSize / Math.sqrt(invSlope * invSlope + 1);
+					double stepY = invSlope * stepX;
+					if ((midpointOffsetX < 0) ^ midpointValue)
+						stepY = -stepY;
+					if ((midpointOffsetY > 0) ^ midpointValue)
+						stepX = -stepX;
+//					System.out.println(stepX);
+//					System.out.println(stepY);
+					while ((midpointX >= frameMinX) && (midpointY >= frameMinY) && (midpointX + .5 < frameMaxX) && (midpointY + .5 < frameMaxY) && image.test(midpointX, midpointY) == midpointValue) {
+						midpointX += stepX;
+						midpointY += stepY;
+					}
+					//Take a step backwards
+					midpointX -= stepX;
+					midpointY -= stepY;
 				}
+//				Point2D res = pointA.insertNext(midpointX, midpointY);
+//				System.out.println(res.toString() + " | " + res.subtract(midpoint) + " | " + midpoint);
 			} else {
-				double invSlope = Math.abs(midpointOffsetX / midpointOffsetY);
-				double stepX = Math.sqrt(1 - invSlope * invSlope);
-				double stepY = invSlope * stepX;
-				if (midpointOffsetX < 0)
-					stepY = -stepY;
-				if (midpointOffsetY > 0)
-					stepX = -stepX;
-				while (midpointX >= 0 && midpointY >= 0 && midpointX <= width && midpointX <= width && image.test(midpointX, midpointY) == midpointValue) {
-					midpointX += stepX;
-					midpointY += stepY;
+//				System.out.println("X");
+				if ((pointA = pointA.next()).equals(startingPoint)) {
+//					System.out.println(blob);
+					break;
 				}
 			}
-		} while (!(pointA = pointB).equals(startingPoint) && (pointB = pointB.next()) != null);
+			if ((pointB = pointA.next()) == null)
+				break;
+		}
+		System.out.println("(done pass2): " + blob);
+	}
+	/**
+	 * Pass3 smoothes straight edges.
+	 * @param blob
+	 */
+	protected void tracePass3(Polygon blob) {
+//		PointNode pointA = blob.getStartingPoint(), pointB, pointC;
+//		while ((pointB = pointA.next()) != null && (pointC = pointB.next()) != null) {
+//			
+//		}
+	}
+	public static class ContourTracerParams implements Externalizable {
+		protected int frameMinX = 0;
+		protected int frameMinY = 0;
+		protected int frameMaxX;
+		protected int frameMaxY;
+		protected int minBlobWidth = 10;
+		protected int minBlobHeight = 10;
+		protected double maxSegmentLength = 4.0;
+		protected double stepSize = 1.0;
+
+		/**
+		 * @return the step size
+		 */
+		public double getStepSize() {
+			return stepSize;
+		}
+
+		/**
+		 * @param stepSize the stepSize to set
+		 * @return self
+		 */
+		public ContourTracerParams setStepSize(double stepSize) {
+			this.stepSize = stepSize;
+			return this;
+		}
+
+		public int getFrameMinX() {
+			return frameMinX;
+		}
+
+		public ContourTracerParams setFrameMinX(int frameWidth) {
+			this.frameMinX = frameWidth;
+			return this;
+		}
+
+		public int getFrameMinY() {
+			return frameMinY;
+		}
+
+		public ContourTracerParams setFrameMinY(int frameHeight) {
+			this.frameMinY= frameHeight;
+			return this;
+		}
+
+		public int getMinBlobWidth() {
+			return minBlobWidth;
+		}
+
+		public ContourTracerParams setMinBlobWidth(int minBlobWidth) {
+			this.minBlobWidth = minBlobWidth;
+			return this;
+		}
+
+		public int getFrameMaxX() {
+			return this.frameMaxX;
+		}
+		public int getFrameMaxY() {
+			return this.frameMaxY;
+		}
+		public int getMinBlobHeight() {
+			return minBlobHeight;
+		}
+
+		public ContourTracerParams setMinBlobHeight(int minBlobHeight) {
+			this.minBlobHeight = minBlobHeight;
+			return this;
+		}
+
+		public double getMaxSegmentLength() {
+			return maxSegmentLength;
+		}
+
+		public ContourTracerParams setMaxSegmentLength(double maxSegmentLength) {
+			this.maxSegmentLength = maxSegmentLength;
+			return this;
+		}
+		
+		@Override
+		public void writeExternal(ObjectOutput out) throws IOException {
+			out.writeInt(this.getFrameMinX());
+			out.writeInt(this.getFrameMinY());
+			out.writeInt(this.frameMaxX);
+			out.writeInt(this.frameMaxY);
+			out.writeInt(this.getMinBlobWidth());
+			out.writeInt(this.getMinBlobHeight());
+			out.writeDouble(this.getMaxSegmentLength());
+			out.writeDouble(this.getStepSize());
+		}
+
+		@Override
+		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			this.setFrameMinX(in.readInt());
+			this.setFrameMinY(in.readInt());
+			this.frameMaxX = in.readInt();
+			this.frameMaxY = in.readInt();
+			this.setMinBlobWidth(in.readInt());
+			this.setMinBlobHeight(in.readInt());
+			this.setMaxSegmentLength(in.readDouble());
+			this.setStepSize(in.readDouble());
+		}
+		
 	}
 }

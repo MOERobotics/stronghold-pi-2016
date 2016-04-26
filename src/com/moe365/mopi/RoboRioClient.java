@@ -145,7 +145,7 @@ public class RoboRioClient implements Closeable {
 		this.packet_40 = new DatagramPacket(buffer.array(), 0, 40, address);
 		this.packet_72 = new DatagramPacket(buffer.array(), 0, 72, address);
 	}
-	public void build(short status, short ack) {
+	protected void build(short status, short ack) {
 		buffer.position(0);
 		buffer.putInt(packetNum.getAndIncrement());
 		buffer.putShort(status);
@@ -191,7 +191,11 @@ public class RoboRioClient implements Closeable {
 	public void writeError(long errorCode) throws IOException {
 		build(STATUS_ERROR, (short)0);
 		buffer.putLong(errorCode);
-		socket.send(packet_8);
+		//Pad with 0s
+		buffer.putLong(0);
+		buffer.putLong(0);
+		buffer.putLong(0);
+		socket.send(packet_40);
 	}
 	@Override
 	public void close() throws IOException {

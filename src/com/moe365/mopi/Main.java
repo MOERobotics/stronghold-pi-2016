@@ -67,7 +67,7 @@ public class Main {
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
 	 */
-	public static final String version = "0.2.7-alpha";
+	public static final String version = "0.2.8-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;

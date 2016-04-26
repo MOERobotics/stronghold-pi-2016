@@ -1,233 +1,62 @@
 package com.moe365.mopi;
 
-import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 
 import com.moe365.mopi.geom.PreciseRectangle;
+import com.moe365.mopi.processing.AbstractImageProcessor;
 
 import au.edu.jcu.v4l4j.VideoFrame;
 
-public class ImageProcessor implements Runnable {
+public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle>> {
+	public static final int MIN_SIZE = 8;
 	public static final int step = 1, tolerance = 70;
-	
-	/**
-	 * Convert an integer to a byte by saturating it in <code>[0, 255]</code>.
-	 * @param num the number to saturate
-	 * @return the saturated byte
-	 */
-	public static byte saturateByte(int num) {
-		return (num > 0xFF) ? ((byte)0xFF) : ((num < 0) ? 0 : ((byte)num));
-	}
-	
-	/**
-	 * Split a RGB(A)32 pixel into its RGB component parts
-	 * @param px the RGB(A)32 pixel
-	 * @param buf an array of size >= 3, for storing the channels
-	 */
-	public static void splitRGB(int px, int[] buf) {
-		buf[0] = (px >>> 16) & 0xFF;
-		buf[1] = (px >> 8) & 0xFF;
-		buf[2] = px & 0xFF;
-	}
 	/**
 	 * Whether to save the diff generated.
 	 */
 	public boolean saveDiff = false;
-	/**
-	 * Whether the processor is currently processing images.
-	 */
-	AtomicBoolean imageLock = new AtomicBoolean(false);
-	protected final RoboRioClient client;
-	/**
-	 * A frame where the flash is off
-	 */
-	final AtomicReference<VideoFrame> frameOff = new AtomicReference<>();
-	/**
-	 * A frame where the flash is on
-	 */
-	final AtomicReference<VideoFrame> frameOn = new AtomicReference<>();
-	final int width, height;
-	final short[][] onRed, onGreen, onBlue, offRed, offGreen, offBlue;
 	BufferedImage img;
-	AtomicInteger i = new AtomicInteger(0);
-	Thread thread;
-	public ImageProcessor(int width, int height, RoboRioClient client) {
-		this.width = width;
-		this.height = height;
-		this.client = client;
-		
-		this.onRed = new short[height][width];
-		this.onGreen = new short[height][width];
-		this.onBlue = new short[height][width];
-		
-		this.offRed = new short[height][width];
-		this.offGreen = new short[height][width];
-		this.offBlue = new short[height][width];
+	protected final AtomicInteger i = new AtomicInteger(0);
+	public ImageProcessor(int width, int height, Consumer<List<PreciseRectangle>> handler) {
+		super(0, 0, width, height, handler);
 		
 		img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-		this.thread = new Thread(this);
-		thread.setName("ProcessorThread-" + thread.getId());
 	}
-	/**
-	 * Start the processor thread
-	 * @return self
-	 */
-	public ImageProcessor start() {
-		thread.start();
-		return this;
-	}
-	public boolean update(VideoFrame frame, boolean flash) {
-		if (imageLock.get()) {
-			frame.recycle();
-			return false;
-		}
-		VideoFrame oldFrame = (flash ? frameOn : frameOff).getAndSet(frame);
-		if (oldFrame != null)
-			oldFrame.recycle();
-		return true;
-	}
-	@Override
-	public void run() {
-		try {
-			while (!Thread.interrupted()) {
-				while (frameOff.get() == null || frameOn.get() == null)
-					Thread.sleep(100);
-				if (!imageLock.compareAndSet(false, true))
-					throw new IllegalStateException();
-				try {
-					//check again, just to be safe
-					if (frameOff.get() != null && frameOn.get() != null) {
-						if (saveDiff)
-							calcDeltaWithDiff(img);
-						else
-							calcDeltaAdv();
-						//release the processed frames
-						frameOff.get().recycle();
-						frameOff.set(null);
-						frameOn.get().recycle();
-						frameOn.set(null);
-					}
-				} finally {
-					//release the lock on images
-					if (!imageLock.compareAndSet(true, false))
-						throw new IllegalStateException();
-				}
-			}
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return;
-		} catch (Exception e) {
-			//be sure to print any/all exceptions
-			e.printStackTrace();
-			throw e;
-		}
-	}
-	public void read(VideoFrame frame, short[][] red, short[][] green, short[][] blue) {
-		System.out.println("Reading...");
-		BufferedImage img = frame.getBufferedImage();
-		int[] row = new int[width];
-		for (int y = 0; y < height; y++) {
-			short[] r = red[y], g = green[y], b = blue[y];
-			img.getRGB(0, y, width, 1, row, 0, 0);
-			for (int x = 0; x < width; x++) {
-				int px = row[x];
-				r[x] = (short) ((px >>> 16) & 0xFF);
-				g[x] = (short) ((px >>>  8) & 0xFF);
-				b[x] = (short) (px & 0xFF);
-			}
-		}
-		System.out.println("Done reading");
-	}
-	@SuppressWarnings("unused")
-	@Deprecated
-	public void calcDeltaSimple(BufferedImage img) {
-		System.out.println("Calculating...");
-		img.flush();
-		int[] pixels = new int[width];
-		for (int y=0; y < height; y++) {
-			short[] r = onRed[y], R = offRed[y], g = onGreen[y], G = offGreen[y], b = onBlue[y], B = offBlue[y];
-			for (int x=0; x<width; x++) {
-				int dR = 0;//Math.min(Math.max(0, r[x] - R[x]), 255);
-				int dG = (g[x] - G[x]) > 30 ? 255 : 0 ;
-				int dB = 0;//Math.abs(B[x] - b[x]);
-				pixels[x] = ((dR & 0xFF) << 16) | ((dG & 0xFF) << 8) | (dB & 0xFF);
-			}
-			img.setRGB(0, y, width, 1, pixels, 0, 0);
-		}
-		System.out.println("(done)");
-	}
-	public void calcDeltaWithDiff(BufferedImage img) {
+	public boolean[][] calcDeltaWithDiff(VideoFrame frameOn, VideoFrame frameOff, BufferedImage img) {
 		// calculated yet)
-		boolean[][] processed = new boolean[height][width];
+		boolean[][] processed = new boolean[getFrameHeight()][getFrameWidth()];
 		// boolean array of the results. A cell @ result[y][x] is only
 		// valid if processed[y][x] is true.
-		boolean[][] result = new boolean[height][width];
+		boolean[][] result = new boolean[getFrameHeight()][getFrameWidth()];
 		System.out.println("Calculating...");
 		img.flush();
-		if (this.frameOff.get() == null || this.frameOn.get() == null)
-			return;
-		BufferedImage off = this.frameOff.get().getBufferedImage();
-		BufferedImage on = this.frameOn.get().getBufferedImage();
-		System.out.println("CM: " + on.getColorModel());
-		System.out.println("CMCL: " + on.getColorModel().getClass());
+		BufferedImage offImg = frameOff.getBufferedImage();
+		BufferedImage onImg = frameOn.getBufferedImage();
+		System.out.println("CM: " + onImg.getColorModel());
+		System.out.println("CMCL: " + onImg.getColorModel().getClass());
 		int[] pxOn = new int[3], pxOff = new int[3];
-		for (int y=step; y < height - step; y+=step) {
-			for (int x = step + ((y % (2 * step) == 0) ? step/2 : 0); x < width - step; x += step) {
-				if (processed[y][x])
+		for (int y = frameMinY + step; y < frameMaxY - step; y += step) {
+			final int idxY = y - frameMinY;
+			for (int x = frameMinX + step + ((y % (2 * step) == 0) ? step/2 : 0); x < frameMaxX; x += step) {
+				final int idxX = x - frameMinX;
+				if (processed[idxY][idxX])
 					continue;
-				processed[y][x] = true;
-				splitRGB(on.getRGB(x, y), pxOn);
-				splitRGB(off.getRGB(x, y), pxOff);
+				processed[idxY][idxX] = true;
+				splitRGB(onImg.getRGB(x, y), pxOn);
+				splitRGB(offImg.getRGB(x, y), pxOff);
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
-				int px = (saturateByte(dR) << 16) | (saturateByte(dG) << 8) | saturateByte(dB);
-				/*if (dG > tolerance) {
-					for (int i = y - step/2; i < y + step/2; i++) {
-						for (int j = x - step/2; j < x + step/2; x++) {
-							int rA = on.getRGB(j, i);
-							int rB = on.getRGB(j, i);
-							img.setRGB(j, i, (((rA >> 16) & 0xFF) - ((rB >> 16) & 0xFF)<<16));
-						}
-					}
-				}*/
-//				px = ((Math.max(pxOn[0] - pxOff[0], 0) & 0xFF) << 16) | ((Math.max(pxOn[1] - pxOff[1], 0) & 0xFF) << 8) | (Math.max(pxOn[2] - pxOff[2], 0) & 0xFF);
-//				if (dR > tolerance)
-//					px |= 0xFF0000;
-				if (dG > tolerance)
-					result[y][x] = true;
-//				if (dB > tolerance)
-//					px |= 0xFF;
-				img.setRGB(x, y, px);
-				/*if (dG > tolerance) {
-					for (int y1 = Math.max(0, y-15); y1 < Math.min(height, y + 15); y1++) {
-						for (int x1 = Math.max(0, x-15); x1 < Math.min(width, x + 15); x1++) {
-							if (processed[y1][x1])
-								continue;
-							processed[y1][x1] = true;
-							px = 0;
-							split(on.getRGB(x1, y1), pxOn);
-							split(off.getRGB(x1, y1), pxOff);
-							if (pxOn[0] - pxOff[0] > 50)
-								px |= 0xFF0000;
-							if (pxOn[1] - pxOff[1] > 50)
-								px |= 0xFF00;
-							if (pxOn[2] - pxOff[2] > 50)
-								px |= 0xFF;
-							img.setRGB(x1, y1, px);
-						}
-					}
-				}*/
+				if (dG > tolerance && dR < tolerance)//TODO fix
+					result[idxY][idxX] = true;
+				img.setRGB(x, y, (saturateByte(dR) << 16) | (saturateByte(dG) << 8) | saturateByte(dB));
 			}
 		}
 		try {
@@ -240,83 +69,63 @@ public class ImageProcessor implements Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		processBooleanMap(result);
+		return result;
 	}
-	@SuppressWarnings("unused")
-	public void calcDeltaAdv() {
+	public boolean[][] calcDeltaAdv(VideoFrame frameOn, VideoFrame frameOff) {
 		// Whether the value of any cell in result[][] is valid (has been
 		// calculated yet)
-		boolean[][] processed = new boolean[height][width];
+		boolean[][] processed = new boolean[getFrameHeight()][getFrameWidth()];
 		// boolean array of the results. A cell @ result[y][x] is only
 		// valid if processed[y][x] is true.
-		boolean[][] result = new boolean[height][width];
+		boolean[][] result = new boolean[getFrameHeight()][getFrameWidth()];
 		System.out.println("Calculating...");
-		if (this.frameOff.get() == null || this.frameOn.get() == null)
-			return;
-		BufferedImage off = this.frameOff.get().getBufferedImage();
-		BufferedImage on = this.frameOn.get().getBufferedImage();
+		BufferedImage offImg = frameOff.getBufferedImage();
+		BufferedImage onImg = frameOn.getBufferedImage();
 		int[] pxOn = new int[3], pxOff = new int[3];
-		for (int y = step; y < height - step; y += step) {
-			for (int x = step + ((y % (2 * step) == 0) ? step/2 : 0); x < width - step; x += step) {
-				if (processed[y][x])
+		for (int y = frameMinY + step; y < frameMaxY - step; y += step) {
+			final int idxY = y - frameMinY;
+			for (int x = frameMinX + step + ((y % (2 * step) == 0) ? step/2 : 0); x < frameMaxX; x += step) {
+				final int idxX = x - frameMinX;
+				if (processed[idxY][idxX])
 					continue;
-				processed[y][x] = true;
-				splitRGB(on.getRGB(x, y), pxOn);
-				splitRGB(off.getRGB(x, y), pxOff);
+				processed[idxY][idxX] = true;
+				splitRGB(onImg.getRGB(x, y), pxOn);
+				splitRGB(offImg.getRGB(x, y), pxOff);
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
-//				if (dR > tolerance)
-//					px |= 0xFF0000;
-				if (dG > tolerance)//TODO fix
-					result[y][x] = true;
-//				if (dB > tolerance)
-//					px |= 0xFF;
+				if (dG > tolerance && dR < tolerance)//TODO fix
+					result[idxY][idxX] = true;
 			}
 		}
-		processBooleanMap(result);
+		return result;
 	}
-	protected void processBooleanMap(boolean[][] processed) {
+	protected List<PreciseRectangle> processBooleanMap(boolean[][] processed) {
 		// List of the rectangles to be generated by boundingBoxRecursive
-		List<PreciseRectangle> rectangles;
-		{
-			List<Rectangle> upRects = new LinkedList<>();
-			//find rectangles
-			BoundingBoxThing.boundingBoxRecursive(processed, upRects, 0, processed[0].length - 1, 0, processed.length - 1, -1, -1, -1, -1);
-			//sort the rectangles by area
-			upRects.sort((a,b)->(Double.compare(b.getWidth() * b.getHeight(), a.getWidth() * a.getHeight())));
-			final double wf = 1.0 / ((double) width);
-			final double hf = 1.0 / ((double) height);
-			//scale the rectangles to be in terms of width/height
-			rectangles = upRects.stream()
-					.map(r->(new PreciseRectangle(r).scale(wf, hf, wf, hf)))
-					.collect(Collectors.toList());
-		}
-		//print the rectangles' dimensions to STDOUT
-		for (PreciseRectangle rectangle : rectangles) {
-			double x = rectangle.getX();
-			double y = rectangle.getY();
-			double rw = rectangle.getWidth();
-			double rh = rectangle.getHeight();
-			System.out.println("=>X: " + x + "; Y: " + y + "; W: " + rw + "; H:" + rh);
-		}
-		//send the largest rectangle(s) to the Rio
-		try {
-			if (client != null) {
-				if (rectangles.isEmpty()) {
-					client.writeNoneFound();
-				} else if (rectangles.size() == 1) {
-					client.writeOneFound(rectangles.get(0));
-				} else {
-					client.writeTwoFound(rectangles.get(0), rectangles.get(1));
-				}
-			}
-		} catch (IOException | NullPointerException e) {
-			e.printStackTrace();
-		}
-		//Offer the rectangles to be put in the SSE stream
-		if (Main.httpServer != null)
-			Main.httpServer.offerRectangles(rectangles);
+		List<PreciseRectangle> rectangles = new LinkedList<>();
+		//find rectangles
+		BoundingBoxThing.boundingBoxRecursive(processed, rectangles, 0, processed[0].length - 1, 0, processed.length - 1, -1, -1, -1, -1);
+		//sort the rectangles by area
+		final double xFactor = 1.0 / ((double) getFrameWidth());
+		final double yFactor = 1.0 / ((double) getFrameHeight());
+		//scale the rectangles to be in terms of width/height
+		rectangles = rectangles.stream()
+				.map(PreciseRectangle.scalar(xFactor, yFactor, xFactor, yFactor))
+				.sorted((a, b)->(Double.compare(b.getArea(), a.getArea())))
+				.collect(Collectors.toList());
 		System.out.println("(done)");
+		return rectangles;
+	}
+
+	@Override
+	public  List<PreciseRectangle> apply(VideoFrame frameOn, VideoFrame frameOff) {
+		boolean[][] result;
+		if (saveDiff)
+			result = calcDeltaWithDiff(frameOn, frameOff, img);
+		else
+			result = calcDeltaAdv(frameOn, frameOff);
+		if (result == null)
+			return null;
+		return processBooleanMap(result);
 	}
 }

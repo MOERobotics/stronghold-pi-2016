@@ -48,12 +48,36 @@ import com.moe365.mopi.geom.PreciseRectangle;
  */
 public class RoboRioClient implements Closeable {
 	public static final int RIO_PORT = 5801;
+	/**
+	 * Size of the buffer.
+	 */
 	public static final int BUFFER_SIZE = 72;
+	/**
+	 * mDNS address of the RoboRio.
+	 * 
+	 * TODO make more portable for other teams
+	 */
 	public static final String RIO_ADDRESS = "roboRIO-365-FRC.local";
 	
+	/**
+	 * Denotes a packet that should be ignored. No idea why we would need
+	 * to use this, though.
+	 */
 	public static final short STATUS_NOP = 0;
+	/**
+	 * Denotes a packet telling the Rio that no target(s) were found.
+	 */
 	public static final short STATUS_NONE_FOUND = 1;
+	/**
+	 * Denotes a packet telling the Rio that one target has been
+	 * detected. The position data MUST be included in the packet.
+	 */
 	public static final short STATUS_ONE_FOUND = 2;
+	/**
+	 * Denotes a packet telling the Rio that two or more targets
+	 * have been found. The position data of the two largest targets
+	 * found (by area) MUST be included in the packet. 
+	 */
 	public static final short STATUS_TWO_FOUND = 3;
 	public static final short STATUS_ERROR = 4;
 	public static final short STATUS_HELLO_WORLD = 5;
@@ -66,27 +90,28 @@ public class RoboRioClient implements Closeable {
 	public static final short STATUS_CONFIG = 12;
 	
 	/**
-	 * 8 bit packet
+	 * 8 byte packet. Used for sending {@link #STATUS_NONE_FOUND} packets.
 	 */
 	protected DatagramPacket packet_8;
 	/**
-	 * 16 bit packet
+	 * 40 byte packet. Used for sending {@link #STATUS_ONE_FOUND} and
+	 * {@link #STATUS_ERROR} packets.
 	 */
 	protected DatagramPacket packet_40;
 	/**
-	 * 24 bit packet
+	 * 72 byte packet. Used for sending {@link #STATUS_TWO_FOUND} packets.
 	 */
 	protected DatagramPacket packet_72;
-	/**
-	 * UDP socket
-	 */
-	protected DatagramSocket socket;
 	/**
 	 * RoboRIO's address
 	 */
 	protected final SocketAddress address;
 	/**
-	 * My port
+	 * UDP socket
+	 */
+	protected DatagramSocket socket;
+	/**
+	 * The port that we are sending packets from (on the local machine)
 	 */
 	protected final int port;
 	/**
@@ -94,12 +119,14 @@ public class RoboRioClient implements Closeable {
 	 */
 	protected final ByteBuffer buffer;
 	/**
-	 * Packet number
+	 * Packet number. This number is to allow the client to ignore packets that
+	 * are recieved out of order. Always increasing.
 	 */
 	protected AtomicInteger packetNum = new AtomicInteger(0);
 	/**
-	 * Create a 
-	 * @throws SocketException
+	 * Create a client with default settings
+	 * @throws SocketException 
+	 * @throws IOException 
 	 */
 	public RoboRioClient() throws SocketException {
 		this(RIO_PORT, BUFFER_SIZE, new InetSocketAddress(RIO_ADDRESS, RIO_PORT));

@@ -6,7 +6,7 @@ import java.util.List;
 import com.moe365.mopi.geom.PreciseRectangle;
 
 public class BoundingBoxThing {
-	private static final int MINDIM = 8; // Smallest allowable dimension for any
+	private static final int MINDIM = 40; // Smallest allowable dimension for any
 											// side of box
 
 /**

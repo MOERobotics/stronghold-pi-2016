@@ -16,7 +16,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
+import com.moe365.mopi.geom.Polygon;
+import com.moe365.mopi.geom.Polygon.PointNode;
 import com.moe365.mopi.geom.PreciseRectangle;
+import com.moe365.mopi.processing.AbstractImageProcessor;
+import com.moe365.mopi.processing.ContourTracer;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.gpio.GpioPinDigitalOutput;
@@ -67,44 +71,50 @@ public class Main {
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
 	 */
-	public static final String version = "0.2.8-alpha";
+	public static final String version = "0.3.0-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
-	public static MJPEGServer httpServer;
 	public static VideoDevice camera;
 	public static RoboRioClient rioClient;
 	public static JPEGFrameGrabber frameGrabber;
-	public static ImageProcessor processor;
+	public static AbstractImageProcessor<?> processor;
+	/**
+	 * Main entry point.
+	 * @param fred Command line arguments
+	 * @throws IOException
+	 * @throws V4L4JException
+	 * @throws InterruptedException
+	 */
 	public static void main(String...fred) throws IOException, V4L4JException, InterruptedException {
 		CommandLineParser parser = loadParser();
 		ParsedCommandLineArguments parsed = parser.apply(fred);
 		
 		if (parsed.isFlagSet("--help")) {
 			System.out.println(parser.getHelpString());
-			return;
+			System.exit(0);
 		}
 		
 		if (parsed.isFlagSet("--rebuild-parser")) {
 			System.out.print("Building parser...\t");
 			buildParser();
 			System.out.println("Done.");
-			return;
+			System.exit(0);
 		}
 		
 		width = parsed.getOrDefault("--width", 640);
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
-		final MJPEGServer server = httpServer = initServer(parsed);
+		final MJPEGServer server = initServer(parsed);
 		
-		final VideoDevice device = camera =  initCamera(parsed);
+		final VideoDevice device = camera = initCamera(parsed);
 		
 		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
 		
-		final RoboRioClient client = rioClient = initClient(parsed);
+		final RoboRioClient client = initClient(parsed);
 		
-		final ImageProcessor tracer = processor = initProcessor(parsed, client);
+		final AbstractImageProcessor<?> tracer = processor = initProcessor(parsed, server, client);
 		
 		//The state of the LED. Used for timing.
 		final AtomicBoolean ledState = new AtomicBoolean(false);
@@ -122,7 +132,7 @@ public class Main {
 					testClient(client);
 					break;
 				case "sse":
-					testSSE();
+					testSSE(server);
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
@@ -144,7 +154,7 @@ public class Main {
 						if (server != null && ledState.get())
 							server.offerFrame(frame);
 						if (tracer != null && processorEnabled) {
-							tracer.update(frame, ledState.get());
+							tracer.offerFrame(frame, ledState.get());
 						} else {
 							frame.recycle();
 						}
@@ -188,17 +198,17 @@ public class Main {
 			Thread.sleep(1000);
 		}
 	}
-	protected static void testSSE() throws InterruptedException {
+	protected static void testSSE(MJPEGServer server) throws InterruptedException {
 		System.out.println("RUNNING TEST: SSE");
 		while (true) {
 			List<PreciseRectangle> rects = new LinkedList<>();
-			httpServer.offerRectangles(rects);
+			server.offerRectangles(rects);
 			Thread.sleep(1000);
 			rects.add(new PreciseRectangle(0.0,0.0,0.2,0.2));
-			httpServer.offerRectangles(rects);
+			server.offerRectangles(rects);
 			Thread.sleep(1000);
 			rects.add(new PreciseRectangle(0.25,0.75,0.3,0.1));
-			httpServer.offerRectangles(rects);
+			server.offerRectangles(rects);
 			Thread.sleep(1000);
 		}
 	}
@@ -293,19 +303,54 @@ public class Main {
 		InetSocketAddress addr = new InetSocketAddress(address, port);
 		return new RoboRioClient(port, addr);
 	}
-	protected static ImageProcessor initProcessor(ParsedCommandLineArguments args, RoboRioClient client) {
-		if (args.isFlagSet("--no-process")) {
+	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
+		if (args.isFlagSet("--no-process"))
 			System.out.println("PROCESSOR DISABLED");
-			return null;
-		} else {
-			processor = new ImageProcessor(width, height, client);
-			if (args.isFlagSet("--save-diff"))
-				processor.saveDiff = true;
+			if (args.isFlagSet("--trace-contours")) {
+				ContourTracer processor = new ContourTracer(width, height, polygons -> {
+					for (Polygon polygon : polygons) {
+						System.out.println("=> " + polygon);
+						PointNode node = polygon.getStartingPoint();
+						do {
+							node = node.set(node.getX() / width, node.getY() / height);
+						} while (!(node = node.next()).equals(polygon.getStartingPoint()));
+					}
+					if (httpServer != null)
+						httpServer.offerPolygons(polygons);
+				});
+				Main.processor = processor;
+			} else {
+				ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
+					//print the rectangles' dimensions to STDOUT
+					for (PreciseRectangle rectangle : rectangles)
+						System.out.println("=> " + rectangle);
+					
+					//send the largest rectangle(s) to the Rio
+					try {
+						if (client != null) {
+							if (rectangles.isEmpty()) {
+								client.writeNoneFound();
+							} else if (rectangles.size() == 1) {
+								client.writeOneFound(rectangles.get(0));
+							} else {
+								client.writeTwoFound(rectangles.get(0), rectangles.get(1));
+							}
+						}
+					} catch (IOException | NullPointerException e) {
+						e.printStackTrace();
+					}
+					//Offer the rectangles to be put in the SSE stream
+					if (httpServer != null)
+						httpServer.offerRectangles(rectangles);
+				});
+				if (args.isFlagSet("--save-diff"))
+					processor.saveDiff = true;
+				Main.processor = processor;
+			}
 			processor.start();
 			enableProcessor();
 			return processor;
 			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
-		}
 	}
 	public static void enableProcessor() {
 		System.out.println("ENABLING CV");

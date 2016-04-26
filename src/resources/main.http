@@ -154,6 +154,8 @@ Content-Type: text/html\r\n
 					}
 				});
 			}
+			if (window.location.hash.indexOf('sse')>-1)
+				beginSSE();
 			function updateOverlays(quiet) {
 				var w = cvs.width * .05;
 				var h = cvs.height * .1;

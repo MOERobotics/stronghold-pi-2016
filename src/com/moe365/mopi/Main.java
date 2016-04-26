@@ -71,7 +71,7 @@ public class Main {
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
 	 */
-	public static final String version = "0.3.0-alpha";
+	public static final String version = "0.3.1-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -293,11 +293,15 @@ public class Main {
 		return pin;
 	}
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args) throws SocketException {
-		if (args.isFlagSet("--no-udp"))
+		if (args.isFlagSet("--no-udp")) {
+			System.out.println("CLIENT DISABLED");
 			return null;
+		}
 		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
-		if (port < 0)
+		if (port < 0) {
+			System.out.println("CLIENT DISABLED");
 			return null;
+		}
 		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		InetSocketAddress addr = new InetSocketAddress(address, port);

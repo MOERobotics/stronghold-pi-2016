@@ -13,19 +13,19 @@ public class BoundingBoxThing {
  * Recursive function to create a List of Rectangles bbr 
  * that represent all bounding boxes of minimum size MINDIM
  * in boolean array img (which represents a thresholded image) 
- * It retruns true or false to indicate if it found any boxes
- * This method attempts to split the image into 2 (first with vertical line, then horiz) 
+ * It returns true or false to indicate if it found any boxes
+ * This method attempts to split the image into 2 (first with a vertical line, then with a horizontal one) 
  * then call itself on the resulting 2 areas of the image (area set by the lim parameters)
- * The bound parameters store known edges of boxes, once they fully encased box it is added to list. 
+ * The bound parameters store known edges of boxes, once the fully encased box it is added to list. 
  * Add to the bbr list are side effects and are not thread safe.  
  * It is executed in a single thread, depth first.
  * 
  * @param  img  A boolean array which represents a thresholded image
  * @param  bbr List of Rectangles bbr that represent all bounding boxes of minimum size MINDIM
- * @param  limXmin  lower limit of the x postion in the area to search
- * @param  limXmax  upper limit of the x postion in the area to search
- * @param  limYmin  lower limit of the y postion in the area to search
- * @param  limYmax  upper limit of the y postion in the area to search 
+ * @param  limXmin  lower limit of the x position in the area to search
+ * @param  limXmax  upper limit of the x position in the area to search
+ * @param  limYmin  lower limit of the y position in the area to search
+ * @param  limYmax  upper limit of the y position in the area to search 
  * @param  boundXmin  location of valid left edge of box (-1 if none)
  * @param  boundXmax  location of valid right edge of box (-1 if none)
  * @param  boundYmin  location of valid top edge of box (-1 if none)
@@ -36,11 +36,12 @@ public class BoundingBoxThing {
 	public static boolean boundingBoxRecursive(boolean[][] img, List<PreciseRectangle> bbr, final int limXmin, final int limXmax,
 			final int limYmin, final int limYmax, int boundXmin, int boundXmax, int boundYmin, int boundYmax) {
 		if (((limXmax - limXmin) < MINDIM) || ((limYmax - limYmin) < MINDIM))
-			return false; // BASE CASE box is too small, disregard
+			// BASE CASE box is too small, disregard
+			return false;
 		// try to split the box in half vertically or horizontally and call
 		// recursively on the 2 halves
 		int x, y; //defined here since they will be reused and tested after for loops
-		int splitX = limXmin + (limXmax - limXmin) / 2; //half the width first vertical split lne to try
+		int splitX = limXmin + (limXmax - limXmin) / 2; //half the width first vertical split line to try
 		xLoop:
 		for (x = splitX; x > limXmin; x--) {
 			// Left side of half split, test all vertical lines till one doesn't go thru a contour
@@ -239,7 +240,7 @@ public class BoundingBoxThing {
 			boundYmax = y;
 
 		if ((boundXmin < boundXmax) && (boundXmin > -1) && (boundYmin < boundYmax) && (boundYmin > -1))
-			//BASE CASE we have a valid bounding box decribed by the bound variables that cannot be futher split
+			//BASE CASE we have a valid bounding box described by the bound variables that cannot be futher split
 			return bbr.add(new PreciseRectangle(boundXmin, boundYmin, boundXmax - boundXmin, boundYmax - boundYmin));
 		return false;
 	}
@@ -272,6 +273,7 @@ public class BoundingBoxThing {
 	}
 	
 	private static boolean updateXbound(boolean[][] img, int limYmin, int limYmax, int x, boolean left) {
+		// check for pixels on left/right edge of box
 		if (test(img, x, limYmin)) {
 			if (test(img, x + 1, limYmin) && test(img, x + 1, limYmin + 1))
 				return true;

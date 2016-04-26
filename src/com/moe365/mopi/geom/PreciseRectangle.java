@@ -7,6 +7,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
+import java.util.function.Function;
 
 import com.moe365.mopi.util.ReflectionUtils;
 
@@ -17,7 +18,10 @@ import com.moe365.mopi.util.ReflectionUtils;
  */
 public class PreciseRectangle implements Externalizable {
 	protected final double x, y, width, height;
-	protected transient int hash;
+	protected transient int hash = 0;
+	public static Function<PreciseRectangle, PreciseRectangle> scalar(double xf, double yf, double wf, double hf) {
+		return rectangle -> (rectangle.scale(xf, yf, wf, hf));
+	}
 	/**
 	 * For deserializing
 	 */
@@ -110,6 +114,15 @@ public class PreciseRectangle implements Externalizable {
 			hash = buf.hashCode();
 		}
 		return hash;
+	}
+	@Override
+	public String toString() {
+		return new StringBuilder('[')
+				.append(getX())
+				.append(',').append(getY())
+				.append(',').append(getWidth())
+				.append(',').append(getHeight())
+				.append(']').toString();
 	}
 	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {

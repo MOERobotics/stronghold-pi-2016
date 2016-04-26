@@ -141,11 +141,11 @@ Content-Type: text/html\r\n
 								ctx.moveTo(rect[1], rect[2]);
 								ctx.lineTo(rect[1] + rect[3], rect[2]);
 								ctx.lineTo(rect[1] + rect[3], rect[2] + rect[4]);
-								ctx.lineTo(rect[1], rect[3] + rect[4]);
+								ctx.lineTo(rect[1], rect[2] + rect[4]);
 								break;
 							case 1:
 								ctx.moveTo(rect[1] * cvs.width, rect[2] * cvs.height);
-								for(var j = 3; j < rect.length; j+=2)
+								for(var j = 3;j < rect.length; j+=2)
 									ctx.lineTo(rect[j] * cvs.width, rect[j + 1] * cvs.height);
 								break;
 						}

@@ -185,14 +185,14 @@ public class MJPEGServer implements Runnable {
 	 */
 	public void offerFrame(VideoFrame frame) {
 		if (isImageAvailable.get() || (!isJpegBufferLocked.compareAndSet(false, true))) {
-			System.err.print('D');
+//			System.err.print('D');
 			return;
 		}
 		try {
 			jpegWriteBuffer.clear();
 			jpegWriteBuffer.put(Integer.toString(frame.getFrameLength()).getBytes());
 			jpegWriteBuffer.put(new byte[]{'\r','\n','\r','\n'});
-			System.out.println("Frame size: " + (frame.getFrameLength()/1024));
+			System.out.println("Frame " + (frame.getFrameLength()/1024) + "kb");
 			jpegWriteBuffer.put(frame.getBytes(), 0, frame.getFrameLength());
 			jpegWriteBuffer.flip();
 			isImageAvailable.compareAndSet(false, true);
@@ -272,8 +272,8 @@ public class MJPEGServer implements Runnable {
 	protected void attemptWriteNextFrame() {
 		if (this.mjpegChannels.size() == 0 || !(this.isImageAvailable.get() && isJpegBufferLocked.compareAndSet(false, true)))
 			return;
-		System.out.print('W');
-		System.out.print(this.mjpegChannels.size());
+//		System.out.print('W');
+//		System.out.print(this.mjpegChannels.size());
 //		System.out.print('/');
 //		System.out.print(Math.round(writeBuffer.limit()/102.4)/10.0);
 		try {

@@ -335,6 +335,10 @@ public class Main {
 				Main.processor = processor;
 			} else {
 				ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
+					rectangles.removeIf(rectangle-> {
+						double ar = rectangle.getHeight() / rectangle.getWidth();
+						return ar < .1 || ar > 10;
+					});
 					//print the rectangles' dimensions to STDOUT
 					for (PreciseRectangle rectangle : rectangles)
 						System.out.println("=> " + rectangle);

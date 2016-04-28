@@ -360,7 +360,7 @@ public class MJPEGServer implements Runnable {
 			channel.close();
 		} else if (header[1].endsWith("pvsn")) {
 			//Enable PeopleVision (tm)
-			Main.disableProcessor();
+			Main.disableProcessor(this);
 			channel.write(MJPEGServer.HTTP_PAGE_200.duplicate());
 			ByteBuffer tmp = ByteBuffer.allocate(4);
 			tmp.putChar(Main.processorEnabled ? '1' : '0');

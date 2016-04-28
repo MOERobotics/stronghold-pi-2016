@@ -9,6 +9,7 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -374,7 +375,7 @@ public class Main {
 		System.out.println("ENABLING CV");
 		if (processor == null) {
 			if (processorEnabled)
-				disableProcessor();
+				disableProcessor(null);
 			return;
 		}
 		if (camera == null) {
@@ -405,13 +406,16 @@ public class Main {
 	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
 	 * <p>
 	 * This 
+	 * @param server 
 	 */
-	public static void disableProcessor() {
+	public static void disableProcessor(MJPEGServer server) {
 		System.out.println("DISABLING CV");
 		if (camera == null) {
 			processorEnabled = false;
 			return;
 		}
+		if (server != null)
+			server.offerRectangles(Collections.emptyList());
 		try {
 			ControlList controls = camera.getControlList();
 			try {

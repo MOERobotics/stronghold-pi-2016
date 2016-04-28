@@ -308,9 +308,8 @@ public class Main {
 		}
 		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
-		InetSocketAddress addr = new InetSocketAddress(address, port);
 		try {
-			return new RoboRioClient(executor, retryTime, port, addr);
+			return new RoboRioClient(executor, retryTime, port, address);
 		} catch (IOException e) {
 			//restrict scope of broken stuff
 			e.printStackTrace();

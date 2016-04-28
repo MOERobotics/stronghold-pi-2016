@@ -326,6 +326,7 @@ public class Main {
 					for (Polygon polygon : polygons) {
 						System.out.println("=> " + polygon);
 						PointNode node = polygon.getStartingPoint();
+						// Scale
 						do {
 							node = node.set(node.getX() / width, node.getY() / height);
 						} while (!(node = node.next()).equals(polygon.getStartingPoint()));
@@ -336,6 +337,7 @@ public class Main {
 				Main.processor = processor;
 			} else {
 				ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
+					//Filter based on AR
 					rectangles.removeIf(rectangle-> {
 						double ar = rectangle.getHeight() / rectangle.getWidth();
 						return ar < .1 || ar > 10;

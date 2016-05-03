@@ -5,19 +5,22 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
 
 import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.Polygon.PointNode;
+import com.moe365.mopi.geom.PreciseRectangle;
 
 import au.edu.jcu.v4l4j.VideoFrame;
 
 public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
-	protected int minBlobWidth = 10;
+	protected int minBlobWidth = 20;
 	protected int minBlobHeight = 10;
-	protected double maxSegmentLength = 8.0;
+	protected double maxSegmentLength = 10.0;
 	protected double stepSize = 4.0;
 	public static final int minGreenTolerance = 70;
 	public static final int maxRedTolerance = 70;
@@ -38,6 +41,7 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 		BufferedImage imgOff = frameOff.getBufferedImage();
 		final boolean[][] processed = new boolean[getFrameHeight()][getFrameWidth()];
 		final boolean[][] cache = new boolean[getFrameHeight()][getFrameWidth()];
+		System.out.println("Starting pass1");
 		List<Polygon> result = tracePass1((x, y) -> {
 			if (processed[y][x])
 				return cache[y][x];
@@ -46,13 +50,32 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 			int pxOff = imgOff.getRGB(x, y);
 			return cache[y][x] = ((pxOn >> 8) & 0xFF) - ((pxOff >> 8) & 0xFF) > minGreenTolerance && ((pxOn >> 16) & 0xFF) - ((pxOff >> 16) & 0xFF) < maxRedTolerance;
 		});
+		System.out.println("(done)");
 		return result;
 	}
 	
 	protected List<Polygon> tracePass1(BinaryImage image) {
 		List<Polygon> blobs = new LinkedList<Polygon>();
+		List<PreciseRectangle> bounds = new LinkedList<>();
+		yLoop:
 		for (int y = frameMinY + minBlobHeight; y < frameMaxY - minBlobHeight; y+= minBlobHeight) {
+			List<PreciseRectangle> rowBounds = new ArrayList<>();
+			for (PreciseRectangle rectangle : bounds)
+				if (rectangle.getY() <= y && rectangle.getY() + rectangle.getHeight() >= y)
+					rowBounds.add(rectangle);
+			xLoop:
 			for (int x = frameMinX + minBlobWidth + ((y % (2 * minBlobHeight) == 0) ? minBlobWidth/2 : 0); x < frameMaxX - minBlobWidth; x+= minBlobWidth) {
+				Iterator<PreciseRectangle> rectangles = rowBounds.iterator();
+				while (rectangles.hasNext()) {
+					PreciseRectangle rectangle = rectangles.next();
+					double maxX = rectangle.getX() + rectangle.getWidth();
+					if (rectangle.getX() < x && maxX > x) {
+						//skip to the end of the rectangle
+						x += (int)(maxX - x + minBlobWidth/2) % minBlobWidth;
+						
+						continue xLoop;
+					}
+				}
 				if (image.test(x, y)) {
 					Polygon blob = new Polygon();
 					int topY, bottomY, leftX, rightX;
@@ -67,6 +90,12 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 					tracePass2(image, blob);
 					tracePass3(blob);
 					blobs.add(blob);
+					//skip to the end of this rectangle
+					PreciseRectangle blobBounds = blob.getBoundingBox();
+					x += (int)(blobBounds.getX() + blobBounds.getWidth() - x + minBlobWidth/2) % minBlobWidth;
+					rowBounds.add(blobBounds);
+					bounds.add(blobBounds);
+					continue;
 				}
 			}
 		}
@@ -82,11 +111,9 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 		final PointNode startingPoint = blob.getStartingPoint();
 		PointNode pointA = startingPoint, pointB = pointA.next();
 		while (true) {
-//			System.out.print(pointA.toString() + "/" + pointB.toString() + ":\t");
 			// Use distance^2, because x^2 < r^2 if x < r, and x^2 > r^2 if x > r, and it's faster, because no sqrt operations.
 			if (pointA.equals(pointB)) {
 				pointA.removeNext();
-//				System.out.println("R");
 			} else if (pointA.getDistanceSquared(pointB) > maxSegmentLength * maxSegmentLength) {
 				// point A and B are >r px apart
 				
@@ -126,8 +153,6 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 						stepY = -stepY;
 					if ((midpointOffsetY > 0) ^ midpointValue)
 						stepX = -stepX;
-//					System.out.println(stepX);
-//					System.out.println(stepY);
 					while ((midpointX >= frameMinX) && (midpointY >= frameMinY) && (midpointX + .5 < frameMaxX) && (midpointY + .5 < frameMaxY) && image.test(midpointX, midpointY) == midpointValue) {
 						midpointX += stepX;
 						midpointY += stepY;
@@ -136,14 +161,10 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 					midpointX -= stepX;
 					midpointY -= stepY;
 				}
-//				Point2D res = pointA.insertNext(midpointX, midpointY);
-//				System.out.println(res.toString() + " | " + res.subtract(midpoint) + " | " + midpoint);
+				pointB = pointA.insertNext(midpointX, midpointY);
 			} else {
-//				System.out.println("X");
-				if ((pointA = pointA.next()).equals(startingPoint)) {
-//					System.out.println(blob);
+				if ((pointA = pointA.next()).equals(startingPoint))
 					break;
-				}
 			}
 			if ((pointB = pointA.next()) == null)
 				break;

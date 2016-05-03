@@ -26,8 +26,8 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	 * @return saturated byte
 	 * @see <a href="https://en.wikipedia.org/wiki/Saturation_arithmetic">Saturation Arithmatic | Wikipedia</a>
 	 */
-	public static byte saturateByte(int num) {
-		return (num > 0xFF) ? ((byte)0xFF) : ((num < 0) ? 0 : ((byte)num));
+	public static int saturateByte(int num) {
+		return (num > 0xFF) ? (0xFF) : ((num < 0) ? 0 : num);
 	}
 	
 	/**
@@ -89,7 +89,7 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	 * 
 	 * @param frame
 	 * @param flash
-	 * @return
+	 * @return whether the frame was used
 	 */
 	public boolean offerFrame(VideoFrame frame, boolean flash) {
 		if (imageLock.get()) {
@@ -111,14 +111,25 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	public void run() {
 		try {
 			while (!Thread.interrupted()) {
-				while (frameOff.get() == null || frameOn.get() == null)
-					Thread.sleep(100);
+				while (frameOff.get() == null || frameOn.get() == null) {
+					Thread.yield();//TODO test if this is correct
+					Thread.sleep(100);//TODO remove this if yield works?
+				}
+				
+				//Attempt to lock image writes
 				if (!imageLock.compareAndSet(false, true))
-					throw new IllegalStateException();
+					throw new IllegalMonitorStateException("Did you start the thread multiple times?");
 				try {
 					//check again, just to be safe
 					if (frameOff.get() != null && frameOn.get() != null) {
-						R result = apply(frameOn.get(), frameOff.get());
+						R result;
+						try {
+							result = apply(frameOn.get(), frameOff.get());
+						} catch(ArrayIndexOutOfBoundsException | NullPointerException e) {
+							//These exceptions can probably be recovered from.
+							e.printStackTrace();
+							continue;
+						}
 						if (this.resultConsumer != null)
 							this.resultConsumer.accept(result);
 						

@@ -9,9 +9,11 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -106,13 +108,15 @@ public class Main {
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
-		final MJPEGServer server = initServer(parsed);
+		final ExecutorService executor = Executors.newCachedThreadPool();
+		
+		final MJPEGServer server = initServer(parsed, executor);
 		
 		final VideoDevice device = camera = initCamera(parsed);
 		
 		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
 		
-		final RoboRioClient client = initClient(parsed);
+		final RoboRioClient client = initClient(parsed, executor);
 		
 		final AbstractImageProcessor<?> tracer = processor = initProcessor(parsed, server, client);
 		
@@ -292,20 +296,27 @@ public class Main {
 		pin.setState(false);//turn it off
 		return pin;
 	}
-	protected static RoboRioClient initClient(ParsedCommandLineArguments args) throws SocketException {
+	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
 			System.out.println("CLIENT DISABLED");
 			return null;
 		}
 		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
+		int retryTime = args.getOrDefault("--mdns-resolve-retry", 5_000);
 		if (port < 0) {
 			System.out.println("CLIENT DISABLED");
 			return null;
 		}
 		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
-		InetSocketAddress addr = new InetSocketAddress(address, port);
-		return new RoboRioClient(port, addr);
+		try {
+			return new RoboRioClient(executor, retryTime, port, address);
+		} catch (IOException e) {
+			//restrict scope of broken stuff
+			e.printStackTrace();
+			System.err.println("CLIENT DISABLED");
+			return null;
+		}
 	}
 	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
 		if (args.isFlagSet("--no-process"))
@@ -315,6 +326,7 @@ public class Main {
 					for (Polygon polygon : polygons) {
 						System.out.println("=> " + polygon);
 						PointNode node = polygon.getStartingPoint();
+						// Scale
 						do {
 							node = node.set(node.getX() / width, node.getY() / height);
 						} while (!(node = node.next()).equals(polygon.getStartingPoint()));
@@ -325,6 +337,11 @@ public class Main {
 				Main.processor = processor;
 			} else {
 				ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
+					//Filter based on AR
+					rectangles.removeIf(rectangle-> {
+						double ar = rectangle.getHeight() / rectangle.getWidth();
+						return ar < .1 || ar > 10;
+					});
 					//print the rectangles' dimensions to STDOUT
 					for (PreciseRectangle rectangle : rectangles)
 						System.out.println("=> " + rectangle);
@@ -360,7 +377,7 @@ public class Main {
 		System.out.println("ENABLING CV");
 		if (processor == null) {
 			if (processorEnabled)
-				disableProcessor();
+				disableProcessor(null);
 			return;
 		}
 		if (camera == null) {
@@ -391,13 +408,16 @@ public class Main {
 	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
 	 * <p>
 	 * This 
+	 * @param server 
 	 */
-	public static void disableProcessor() {
+	public static void disableProcessor(MJPEGServer server) {
 		System.out.println("DISABLING CV");
 		if (camera == null) {
 			processorEnabled = false;
 			return;
 		}
+		if (server != null)
+			server.offerRectangles(Collections.emptyList());
 		try {
 			ControlList controls = camera.getControlList();
 			try {
@@ -432,12 +452,12 @@ public class Main {
 	 * @return server, if created, or null
 	 * @throws IOException
 	 */
-	protected static MJPEGServer initServer(ParsedCommandLineArguments args) throws IOException {
+	protected static MJPEGServer initServer(ParsedCommandLineArguments args, ExecutorService executor) throws IOException {
 		int port = args.getOrDefault("--port", DEFAULT_PORT);
 		
 		if (port > 0 && !args.isFlagSet("--no-server")) {
 			MJPEGServer server = new MJPEGServer(new InetSocketAddress(port));
-			server.runOn(Executors.newCachedThreadPool());
+			server.runOn(executor);
 			server.start();
 			return server;
 		} else {
@@ -446,6 +466,7 @@ public class Main {
 		return null;
 	}
 	protected static void testConverter(VideoDevice dev) {
+		@SuppressWarnings("unused")
 		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
 	}
 	/**
@@ -487,37 +508,45 @@ public class Main {
 			.addFlag("--help", "Displays the help message and exits")
 			.alias("-h", "--help")
 			.alias("-?", "--help")
-			.addKvPair("--camera", "device", "Specify the camera device file to use. Default '/dev/video0'")
-			.alias("-C", "--camera")
 			.addFlag("--verbose", "Enable verbose output (not implemented)")
 			.alias("-v", "--verbose")
+			.addFlag("--version", "Print the version string.")
 			.addFlag("--out", "Specify where to write log messages to (not implemented)")
+			.addKvPair("--test", "target", "Run test by name. Tests include 'converter', 'controls', 'client', and 'sse'.")
+			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
+			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
+			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")
+			// Camera options
+			.addKvPair("--camera", "device", "Specify the camera device file to use. Default '/dev/video0'")
+			.alias("-C", "--camera")
+			.addKvPair("--width", "px", "Set the width of image to capture/broadcast")
+			.addKvPair("--height", "px", "Set the height of image to capture/broadcast")
+			.addKvPair("--jpeg-quality", "quality", "Set the JPEG quality to request. Must be 1-100")
+			.addKvPair("--fps-num", "numerator", "Set the FPS numerator. If the camera does not support the set framerate, the closest one available is chosen.")
+			.addKvPair("--fps-denom", "denom", "Set the FPS denominator. If the camera does not support the set framerate, the closest one available is chosen.")
+			// HTTP server options
 			.addKvPair("--port", "port", "Specify the port for the HTTP server to listen on. Default 5800; a negative port number is equivalent to --no-server")
 			.alias("-p", "--port")
-			.addFlag("--version", "Print the version string.")
+			// GPIO options
+			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use. Is ignored if --no-gpio is set")
+			// Image processor options
+			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis when processing sweep 1 (not implemented)")
+			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis when processing sweep 1 (not implemented)")
+			.addFlag("--trace-contours", "Enable the (dev) contour tracing algorithm")
+			.addFlag("--save-diff", "Save the diff image to a file (./img/delta[#].png). Requires processor.")
+			// Client options
 			.addKvPair("--udp-target", "address", "Specify the address to broadcast UDP packets to")
 			.alias("--rio-addr", "--udp-target")
 			.addKvPair("--udp-port", "port", "Specify the port to send UDP packets to. Default 5801; a negative port number is equivalent to --no-udp.")
 			.alias("--rio-port", "--udp-port")
-			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
-			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
-			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")
-			.addKvPair("--test", "target", "Run test by name. Tests include 'converter', 'controls', 'client', and 'sse'.")
-			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use. Is ignored if --no-gpio is set")
-			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis when processing sweep 1 (not implemented)")
-			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis when processing sweep 1 (not implemented)")
-			.addKvPair("--width", "px", "Set the width of image to capture/broadcast")
-			.addKvPair("--height", "px", "Set the height of image to capture/broadcast")
-			.addFlag("--trace-contours", "Enable the (dev) contour tracing algorithm")
-			.addKvPair("--fps-num", "numerator", "Set the FPS numerator. If the camera does not support the set framerate, the closest one available is chosen.")
-			.addKvPair("--fps-denom", "denom", "Set the FPS denominator. If the camera does not support the set framerate, the closest one available is chosen.")
+			.addKvPair("--mdns-resolve-retry", "time", "Set the interval to retry to resolve the Rio's address")
+			.alias("--rio-resolve-retry", "--mdns-resolve-retry")
+			// Disabling stuff options
 			.addFlag("--no-server", "Disable the HTTP server.")
 			.addFlag("--no-process", "Disable image processing.")
 			.addFlag("--no-camera", "Do not specify a camera. This option will cause the program to not invoke v4l4j.")
 			.addFlag("--no-udp", "Disable broadcasting UDP.")
 			.addFlag("--no-gpio", "Disable attaching to a pin. Invoking this option will not invoke WiringPi. Note that the pin is reqired for image processing.")
-			.addFlag("--save-diff", "Save the diff image to a file (./img/delta[#].png). Requires processor.")
-			.addKvPair("--jpeg-quality", "quality", "Set the JPEG quality to request. Must be 1-100")
 			.build();
 		File outputFile = new File("src/resources/parser.ser");
 		if (outputFile.exists())

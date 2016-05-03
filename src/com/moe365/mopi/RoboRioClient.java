@@ -4,9 +4,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -107,7 +109,7 @@ public class RoboRioClient implements Closeable {
 	/**
 	 * RoboRIO's address
 	 */
-	protected final SocketAddress address;
+	protected SocketAddress address;
 	/**
 	 * UDP socket
 	 */
@@ -192,6 +194,51 @@ public class RoboRioClient implements Closeable {
 					return;
 				} catch (IllegalArgumentException e) {
 					System.err.println("UNABLE TO RESOLVE " + address + " (retry in " + resolveRetryTime + "ms)");
+				}
+				try {
+					Thread.sleep(resolveRetryTime);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+					return;
+				}
+				Thread.yield();
+			}
+		});
+	}
+	public RoboRioClient(ExecutorService executor, long resolveRetryTime, int port, String addr) throws SocketException, IOException {
+		this.executor = executor;
+		this.port = port;
+		this.buffer = ByteBuffer.allocate(BUFFER_SIZE);
+		System.out.println("Connecting to RIO: " + port + " | " + addr);
+		this.socket = new DatagramSocket(port);
+		try {
+			socket.setTrafficClass(0x10);//Low delay
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
+		System.out.println("ATTEMPT RESOLVE " + address);
+		executor.submit(() -> {
+			String host = addr;
+			int addrPort = 5801;
+			if (host.contains(":")) {
+				int idx = host.lastIndexOf(':');
+				addrPort = Integer.valueOf(host.substring(idx + 1));
+				host = host.substring(0, idx);
+			}
+			while (!(this.isResolved || Thread.interrupted())) {
+				try {
+					//System.out.println(address.toString() + "|" + ((InetSocketAddress)address).isUnresolved());
+					InetAddress address = InetAddress.getByName(addr);
+					InetSocketAddress sAddr = new InetSocketAddress(address, addrPort);
+					this.packet_8 = new DatagramPacket(buffer.array(), 0, 8, sAddr);
+					this.packet_40 = new DatagramPacket(buffer.array(), 0, 40, sAddr);
+					this.packet_72 = new DatagramPacket(buffer.array(), 0, 72, sAddr);
+					this.address = sAddr;
+					this.isResolved = true;
+					System.out.println("RESOLVED " + sAddr);
+					return;
+				} catch (IllegalArgumentException | UnknownHostException e) {
+					System.err.println("UNABLE TO RESOLVE " + addr + " (retry in " + resolveRetryTime + "ms)");
 				}
 				try {
 					Thread.sleep(resolveRetryTime);

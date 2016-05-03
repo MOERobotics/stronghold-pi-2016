@@ -89,7 +89,7 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	 * 
 	 * @param frame
 	 * @param flash
-	 * @return
+	 * @return whether the frame was used
 	 */
 	public boolean offerFrame(VideoFrame frame, boolean flash) {
 		if (imageLock.get()) {
@@ -113,6 +113,8 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 			while (!Thread.interrupted()) {
 				while (frameOff.get() == null || frameOn.get() == null)
 					Thread.sleep(100);
+				
+				//Attempt to lock image writes
 				if (!imageLock.compareAndSet(false, true))
 					throw new IllegalStateException();
 				try {

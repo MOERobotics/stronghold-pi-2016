@@ -118,7 +118,14 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 				try {
 					//check again, just to be safe
 					if (frameOff.get() != null && frameOn.get() != null) {
-						R result = apply(frameOn.get(), frameOff.get());
+						R result;
+						try {
+							result = apply(frameOn.get(), frameOff.get());
+						} catch(ArrayIndexOutOfBoundsException | NullPointerException e) {
+							//These exceptions can probably be recovered from.
+							e.printStackTrace();
+							continue;
+						}
 						if (this.resultConsumer != null)
 							this.resultConsumer.accept(result);
 						

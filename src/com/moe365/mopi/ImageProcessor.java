@@ -74,6 +74,8 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 			ImageIO.write(imgR, "PNG", new File(imgDir, "dr" + num + ".png"));
 			ImageIO.write(imgG, "PNG", new File(imgDir, "dg" + num + ".png"));
 			ImageIO.write(imgB, "PNG", new File(imgDir, "db" + num + ".png"));
+			ImageIO.write(onImg, "PNG", new File(imgDir, "on" + num + ".png"));
+			ImageIO.write(offImg, "PNG", new File(imgDir, "off" + num + ".png"));
 			ImageIO.write(imgFlt, "PNG", file);
 		} catch (Exception e) {
 			e.printStackTrace();

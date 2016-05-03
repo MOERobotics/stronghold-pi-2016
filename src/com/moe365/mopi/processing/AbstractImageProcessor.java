@@ -118,7 +118,7 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 				
 				//Attempt to lock image writes
 				if (!imageLock.compareAndSet(false, true))
-					throw new IllegalStateException();
+					throw new IllegalMonitorStateException("Did you start the thread multiple times?");
 				try {
 					//check again, just to be safe
 					if (frameOff.get() != null && frameOn.get() != null) {

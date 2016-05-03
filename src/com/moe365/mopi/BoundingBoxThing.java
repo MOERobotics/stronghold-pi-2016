@@ -258,10 +258,10 @@ public class BoundingBoxThing {
 	private static boolean updateYbound(boolean[][] img, int limXmin, int limXmax, int y, boolean top) {
 		// check for pixels on top/bottom edge of box
 		if (test(img, limXmin, y)) {
-			if (test(img, limXmin, y + 1) && test(img, limXmin + 1, y + 1))
+			if (test(img, limXmin, y + (top ? 1 : -1)) && test(img, limXmin + 1, y + (top ? 1 : -1)))
 				return true;
 		} else if (test(img, limXmax, y)) {
-			if (test(img, limXmax, y + 1) && test(img, limXmax - 1, y + 1))
+			if (test(img, limXmax, y + (top ? 1 : -1)) && test(img, limXmax - 1, y + (top ? 1 : -1)))
 				return true;
 		} else {
 			for (int x = limXmin + 1; x < limXmax - 1; x++)
@@ -273,10 +273,10 @@ public class BoundingBoxThing {
 	
 	private static boolean updateXbound(boolean[][] img, int limYmin, int limYmax, int x, boolean left) {
 		if (test(img, x, limYmin)) {
-			if (test(img, x + 1, limYmin) && test(img, x + 1, limYmin + 1))
+			if (test(img, x + (left ? 1 : -1), limYmin) && test(img, x + (left ? 1 : -1), limYmin + 1))
 				return true;
 		} else if (test(img, x, limYmax)) {
-			if (test(img, x + 1, limYmax) && test(img, x + 1, limYmax - 1))
+			if (test(img, x + (left ? 1 : -1), limYmax) && test(img, x + (left ? 1 : -1), limYmax - 1))
 				return true;
 		} else {
 			for (int y = limYmin + 1; y < limYmax; y++)

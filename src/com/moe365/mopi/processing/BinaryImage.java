@@ -8,8 +8,21 @@ package com.moe365.mopi.processing;
  */
 @FunctionalInterface
 public interface BinaryImage {
-	boolean test(int midpointX, int midpointY);
+	/**
+	 * Get the value of the image at the given coordinate
+	 * @param x x coordinate of pixel to test
+	 * @param y y coordinate of pixel to test
+	 * @return the value of the image at the point
+	 */
+	boolean test(int x, int y);
 
+	/**
+	 * Test the coordinate (x, y) by rounding the doubles.
+	 * @param x x coordinate of pixel to test
+	 * @param y y coordinate of pixel to test
+	 * @return the value of the image at the point
+	 * @see #test(int, int)
+	 */
 	default boolean test(double x, double y) {
 		return test((int)Math.round(x), (int)Math.round(y));
 	}

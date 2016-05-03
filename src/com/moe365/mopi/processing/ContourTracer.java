@@ -17,6 +17,10 @@ import com.moe365.mopi.geom.PreciseRectangle;
 
 import au.edu.jcu.v4l4j.VideoFrame;
 
+/**
+ * An image processor that finds blobs in images by tracing their contours.
+ * @author mailmindlin
+ */
 public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 	protected int minBlobWidth = 20;
 	protected int minBlobHeight = 10;
@@ -103,8 +107,8 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 	}
 	/**
 	 * Pass2 fills out the polygon.
-	 * @param image
-	 * @param blob
+	 * @param image image that the polygon is in
+	 * @param blob partially formed polygon
 	 */
 	protected void tracePass2(BinaryImage image, Polygon blob) {
 		System.out.println("Pass2: " + blob);
@@ -173,14 +177,19 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 	}
 	/**
 	 * Pass3 smoothes straight edges.
-	 * @param blob
+	 * @param blob polygon to smooth
 	 */
 	protected void tracePass3(Polygon blob) {
+		//TODO finish
 //		PointNode pointA = blob.getStartingPoint(), pointB, pointC;
 //		while ((pointB = pointA.next()) != null && (pointC = pointB.next()) != null) {
 //			
 //		}
 	}
+	/**
+	 * Parameters for the ContourTracer, so you can use getter/setters instead of really long constructors.
+	 * @author mailmindlin
+	 */
 	public static class ContourTracerParams implements Externalizable {
 		protected int frameMinX = 0;
 		protected int frameMinY = 0;
@@ -233,13 +242,25 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 			this.minBlobWidth = minBlobWidth;
 			return this;
 		}
-
+		
+		public ContourTracerParams setFrameMaxX(int frameMaxX) {
+			this.frameMaxX = frameMaxX;
+			return this;
+		}
+		
 		public int getFrameMaxX() {
 			return this.frameMaxX;
 		}
+		
+		public ContourTracerParams setFrameMaxY(int frameMaxY) {
+			this.frameMaxY = frameMaxY;
+			return this;
+		}
+		
 		public int getFrameMaxY() {
 			return this.frameMaxY;
 		}
+		
 		public int getMinBlobHeight() {
 			return minBlobHeight;
 		}
@@ -262,8 +283,8 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 		public void writeExternal(ObjectOutput out) throws IOException {
 			out.writeInt(this.getFrameMinX());
 			out.writeInt(this.getFrameMinY());
-			out.writeInt(this.frameMaxX);
-			out.writeInt(this.frameMaxY);
+			out.writeInt(this.getFrameMaxX());
+			out.writeInt(this.getFrameMaxY());
 			out.writeInt(this.getMinBlobWidth());
 			out.writeInt(this.getMinBlobHeight());
 			out.writeDouble(this.getMaxSegmentLength());
@@ -274,8 +295,8 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 			this.setFrameMinX(in.readInt());
 			this.setFrameMinY(in.readInt());
-			this.frameMaxX = in.readInt();
-			this.frameMaxY = in.readInt();
+			this.setFrameMaxX(in.readInt());
+			this.setFrameMaxY(in.readInt());
 			this.setMinBlobWidth(in.readInt());
 			this.setMinBlobHeight(in.readInt());
 			this.setMaxSegmentLength(in.readDouble());

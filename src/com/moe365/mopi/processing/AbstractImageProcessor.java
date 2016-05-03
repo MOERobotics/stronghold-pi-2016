@@ -31,9 +31,9 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	}
 	
 	/**
-	 * 
-	 * @param px
-	 * @param buf
+	 * Split an RGB32 pixel into an array of its components
+	 * @param px RGB32 color
+	 * @param buf array of size>=3
 	 */
 	public static void splitRGB(int px, int[] buf) {
 		buf[0] = (px >>> 16) & 0xFF;
@@ -55,11 +55,17 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	 * A frame where the flash is on.
 	 */
 	protected final AtomicReference<VideoFrame> frameOn = new AtomicReference<>();
+	/**
+	 * The minimum valid X coordinate
+	 */
 	protected final int frameMinX, frameMaxX, frameMinY, frameMaxY;
 	/**
 	 * The thread that this processor runs on
 	 */
 	protected Thread thread;
+	/**
+	 * A method to do something with the results.
+	 */
 	protected Consumer<R> resultConsumer;
 	protected AbstractImageProcessor(int frameMinX, int frameMinY, int frameMaxX, int frameMaxY, Consumer<R> output) {
 		this.frameMinX = frameMinX;
@@ -76,6 +82,10 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 		this.thread = new Thread(this);
 		thread.setName("ProcessorThread-" + thread.getId());
 	}
+	/**
+	 * Start the thread
+	 * @return self
+	 */
 	public AbstractImageProcessor<R> start() {
 		thread.start();
 		return this;
@@ -86,9 +96,9 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 		thread.stop();
 	}
 	/**
-	 * 
-	 * @param frame
-	 * @param flash
+	 * Offer a frame. Any VideoFrame passed into this method should be treated as if recycle() has been called on it.
+	 * @param frame VideoFrame offered
+	 * @param flash whether the flash was on when this frame was captured
 	 * @return whether the frame was used
 	 */
 	public boolean offerFrame(VideoFrame frame, boolean flash) {
@@ -101,9 +111,15 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 			oldFrame.recycle();
 		return true;
 	}
+	/**
+	 * Get the width of the valid region for this processor
+	 */
 	protected int getFrameWidth() {
 		return frameMaxX - frameMinX;
 	}
+	/**
+	 * Get the height of the valid region for this processor.
+	 */
 	protected int getFrameHeight() {
 		return frameMaxY - frameMinY;
 	}
@@ -156,8 +172,8 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	}
 	/**
 	 * Internal method to process the two frames.
-	 * @param frameOn
-	 * @param frameOff
+	 * @param frameOn A frame that was taken with a flash
+	 * @param frameOff A frame that was taken without a flash
 	 * @return generated data
 	 */
 	public abstract R apply(VideoFrame frameOn, VideoFrame frameOff);

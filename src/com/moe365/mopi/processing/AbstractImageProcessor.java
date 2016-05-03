@@ -111,8 +111,10 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	public void run() {
 		try {
 			while (!Thread.interrupted()) {
-				while (frameOff.get() == null || frameOn.get() == null)
-					Thread.sleep(100);
+				while (frameOff.get() == null || frameOn.get() == null) {
+					Thread.yield();//TODO test if this is correct
+					Thread.sleep(100);//TODO remove this if yield works?
+				}
 				
 				//Attempt to lock image writes
 				if (!imageLock.compareAndSet(false, true))

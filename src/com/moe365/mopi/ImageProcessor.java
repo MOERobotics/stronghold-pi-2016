@@ -22,21 +22,22 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 	 * Whether to save the diff generated.
 	 */
 	public boolean saveDiff = false;
-	BufferedImage img;
 	protected final AtomicInteger i = new AtomicInteger(0);
 	public ImageProcessor(int width, int height, Consumer<List<PreciseRectangle>> handler) {
 		super(0, 0, width, height, handler);
-		
-		img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 	}
-	public boolean[][] calcDeltaWithDiff(VideoFrame frameOn, VideoFrame frameOff, BufferedImage img) {
+	
+	public boolean[][] calcDeltaWithDiff(VideoFrame frameOn, VideoFrame frameOff) {
 		// calculated yet)
 		boolean[][] processed = new boolean[getFrameHeight()][getFrameWidth()];
 		// boolean array of the results. A cell @ result[y][x] is only
 		// valid if processed[y][x] is true.
 		boolean[][] result = new boolean[getFrameHeight()][getFrameWidth()];
+		BufferedImage imgR = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
+		BufferedImage imgG = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
+		BufferedImage imgB = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
+		BufferedImage imgFlt = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
 		System.out.println("Calculating...");
-		img.flush();
 		BufferedImage offImg = frameOff.getBufferedImage();
 		BufferedImage onImg = frameOn.getBufferedImage();
 		System.out.println("CM: " + onImg.getColorModel());
@@ -54,18 +55,28 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
-				if (dG > tolerance && dR < tolerance)//TODO fix
+				if (dG > tolerance) {//TODO fix
 					result[idxY][idxX] = true;
-				img.setRGB(x, y, (saturateByte(dR) << 16) | (saturateByte(dG) << 8) | saturateByte(dB));
+					imgFlt.setRGB(x, y, 0xFFFFFF);
+				}
+				imgR.setRGB(x, y, saturateByte(dR) << 16);
+				imgG.setRGB(x, y, saturateByte(dG) << 8);
+				imgB.setRGB(x, y, saturateByte(dB));
 			}
 		}
 		try {
 			File imgDir = new File("img");
 			if (!(imgDir.exists() && imgDir.isDirectory()))
 				imgDir.mkdirs();
-			File file = new File(imgDir, "delta" + i.getAndIncrement() + ".png");
+			int num = i.getAndIncrement();
+			File file = new File(imgDir, "delta" + num + ".png");
 			System.out.println("Saving image to " + file);
-			ImageIO.write(img, "PNG", file);
+			ImageIO.write(imgR, "PNG", new File(imgDir, "dr" + num + ".png"));
+			ImageIO.write(imgG, "PNG", new File(imgDir, "dg" + num + ".png"));
+			ImageIO.write(imgB, "PNG", new File(imgDir, "db" + num + ".png"));
+			ImageIO.write(onImg, "PNG", new File(imgDir, "on" + num + ".png"));
+			ImageIO.write(offImg, "PNG", new File(imgDir, "off" + num + ".png"));
+			ImageIO.write(imgFlt, "PNG", file);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -94,7 +105,7 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
-				if (dG > tolerance && dR < tolerance)//TODO fix
+				if (dG > tolerance && (dR < dG - 10 || dR < tolerance))//TODO fix
 					result[idxY][idxX] = true;
 			}
 		}
@@ -121,7 +132,7 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 	public  List<PreciseRectangle> apply(VideoFrame frameOn, VideoFrame frameOff) {
 		boolean[][] result;
 		if (saveDiff)
-			result = calcDeltaWithDiff(frameOn, frameOff, img);
+			result = calcDeltaWithDiff(frameOn, frameOff);
 		else
 			result = calcDeltaAdv(frameOn, frameOff);
 		if (result == null)

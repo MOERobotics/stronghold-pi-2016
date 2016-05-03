@@ -2,6 +2,9 @@ package com.moe365.mopi.geom;
 
 public class Polygon {
 	PointNode start;
+	boolean modified = true;
+	double area;
+	PreciseRectangle bounds;
 	public PointNode startAt(double x, double y) {
 		start = new PointNode(x, y);
 		start.next = start;
@@ -34,12 +37,14 @@ public class Polygon {
 			return next;
 		}
 		public PointNode insertNext(double x, double y) {
+			setModified();
 			PointNode node = new PointNode(this, x, y, this.next);
 			this.next.prev = node;
 			this.next = node;
 			return node;
 		}
 		public PointNode insertNext(PointNode node) {
+			setModified();
 			this.next.prev = node;
 			node.next = this.next;
 			this.next = node;
@@ -47,12 +52,14 @@ public class Polygon {
 			return node;
 		}
 		public PointNode insertBefore(double x, double y) {
+			setModified();
 			PointNode node = new PointNode(this.prev, x, y, this);
 			this.prev.next = node;
 			this.prev = node;
 			return node;
 		}
 		public PointNode insertBefore(PointNode node) {
+			setModified();
 			this.prev.next = node;
 			node.prev = this.prev;
 			this.prev = node;
@@ -64,6 +71,7 @@ public class Polygon {
 			return this;
 		}
 		public PointNode remove() {
+			setModified();
 			this.prev.next = this.next;
 			this.next.prev = this.prev;
 			if (this == start)
@@ -71,6 +79,7 @@ public class Polygon {
 			return this.next;
 		}
 		public PointNode set(double x, double y) {
+			setModified();
 			PointNode node = new PointNode(this.prev, x, y, this.next);
 			this.prev.next = node;
 			this.next.prev = node;
@@ -79,38 +88,49 @@ public class Polygon {
 			return node;
 		}
 	}
+	protected void setModified() {
+		this.bounds = null;
+		this.modified = true;
+	}
 	public void addPoint(double x, double y) {
 		start.insertBefore(x, y);
 	}
 	public double getArea() {
-		double sum = 0.0;
-		PointNode current = start;
-		PointNode next = current.next();
-		do
-			sum += (current.getX() * next.getY() - current.getY() * next.getY());
-		while ((current = next) != null && (next = next.nextIfNotNull()) != start);
-		return sum * .5;
+		if (modified) {
+			double sum = 0.0;
+			PointNode current = start;
+			PointNode next = current.next();
+			do
+				sum += (current.getX() * next.getX() - current.getY() * next.getY());
+			while ((current = next) != null && (next = next.nextIfNotNull()) != start);
+			this.area = sum * .5;
+			modified = false;
+		}
+		return area;
 	}
 	/**
 	 * Convert this rectangle to a bounding box
 	 * @return bounding box
 	 */
 	public PreciseRectangle getBoundingBox() {
-		double minX = start.getX(), maxX = minX;
-		double minY = start.getY(), maxY = minY;
-		PointNode node = start;
-		while (!(node = node.next()).equals(start)) {
-			if (node.getX() < minX)
-				minX = node.getX();
-			else if (node.getX() > maxX)
-				maxX = node.getX();
-			
-			if (node.getY() < minY)
-				minY = node.getY();
-			else if (node.getY() > maxY)
-				maxY = node.getY();
+		if (this.bounds == null) {
+			double minX = start.getX(), maxX = minX;
+			double minY = start.getY(), maxY = minY;
+			PointNode node = start;
+			while (!(node = node.next()).equals(start)) {
+				if (node.getX() < minX)
+					minX = node.getX();
+				else if (node.getX() > maxX)
+					maxX = node.getX();
+				
+				if (node.getY() < minY)
+					minY = node.getY();
+				else if (node.getY() > maxY)
+					maxY = node.getY();
+			}
+			this.bounds = new PreciseRectangle(minX, minY, maxX - minX, maxY - minY);
 		}
-		return new PreciseRectangle(minX, minY, maxX - minX, maxY - minY);
+		return bounds;
 	}
 	public PointNode getStartingPoint() {
 		return start;

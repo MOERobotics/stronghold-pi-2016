@@ -192,7 +192,7 @@ public class MJPEGServer implements Runnable {
 			jpegWriteBuffer.clear();
 			jpegWriteBuffer.put(Integer.toString(frame.getFrameLength()).getBytes());
 			jpegWriteBuffer.put(new byte[]{'\r','\n','\r','\n'});
-			System.out.println("Frame " + (frame.getFrameLength()/1024) + "kb");
+//			System.out.println("Frame " + (frame.getFrameLength()/1024) + "kb");
 			jpegWriteBuffer.put(frame.getBytes(), 0, frame.getFrameLength());
 			jpegWriteBuffer.flip();
 			isImageAvailable.compareAndSet(false, true);

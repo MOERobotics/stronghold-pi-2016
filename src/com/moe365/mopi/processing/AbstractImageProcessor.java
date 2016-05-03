@@ -26,8 +26,8 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	 * @return saturated byte
 	 * @see <a href="https://en.wikipedia.org/wiki/Saturation_arithmetic">Saturation Arithmatic | Wikipedia</a>
 	 */
-	public static byte saturateByte(int num) {
-		return (num > 0xFF) ? ((byte)0xFF) : ((num < 0) ? 0 : ((byte)num));
+	public static int saturateByte(int num) {
+		return (num > 0xFF) ? (0xFF) : ((num < 0) ? 0 : num);
 	}
 	
 	/**

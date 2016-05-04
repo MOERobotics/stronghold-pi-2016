@@ -188,6 +188,10 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 	public class CommandLineUsage implements Serializable {
 		private static final long serialVersionUID = -1994891773152646790L;
 		//TODO finish
+		@Override
+		public String toString() {
+			return "java -jar MoePi.jar [options]";
+		}
 	}
 	
 	/**

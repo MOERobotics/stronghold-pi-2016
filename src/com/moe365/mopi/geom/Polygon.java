@@ -24,17 +24,14 @@ public class Polygon {
 	 */
 	protected PreciseRectangle bounds;
 	/**
-	 * Set the starting X/Y coordinates.
-	 * Clears all points in this polygon.
-	 * @param x x coordinate of point
-	 * @param y y coordinate of point
-	 * @return node created
+	 * Create a polygon starting at the given coordinates
+	 * @param x x-coordinate
+	 * @param y y-coordinate
 	 */
-	public PointNode startAt(double x, double y) {
-		start = new PointNode(x, y);
-		start.next = start;
-		start.prev = start;
-		return start;
+	public Polygon(double x, double y) {
+		this.start = new PointNode(x, y);
+		this.start.next = start;
+		this.start.prev = start;
 	}
 	/**
 	 * A doubly-linked point.

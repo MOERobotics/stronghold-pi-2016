@@ -81,10 +81,9 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 					}
 				}
 				if (image.test(x, y)) {
-					Polygon blob = new Polygon();
 					int topY, bottomY, leftX, rightX;
 					for (leftX = x; leftX > frameMinX && image.test(leftX, y); leftX--);
-					blob.startAt(++leftX, y);
+					Polygon blob = new Polygon(++leftX, y);
 					for (topY = y; topY > frameMinY && image.test(x, topY); topY--);
 					blob.addPoint(x, ++topY);
 					for (rightX = x; rightX < frameMaxX && image.test(rightX, y); rightX++);

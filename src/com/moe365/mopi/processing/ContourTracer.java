@@ -38,6 +38,10 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 	
 	public ContourTracer(ContourTracerParams params, Consumer<List<Polygon>> handler) {
 		super(params.getFrameMinX(), params.getFrameMinY(), params.getFrameMaxX(), params.getFrameMaxY(), handler);
+		this.minBlobWidth = params.getMinBlobWidth();
+		this.minBlobHeight = params.getMinBlobHeight();
+		this.maxSegmentLength = params.getMaxSegmentLength();
+		this.stepSize = params.getStepSize();w
 	}
 	@Override
 	public List<Polygon> apply(VideoFrame frameOn, VideoFrame frameOff) {
@@ -194,10 +198,10 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 		protected int frameMinY = 0;
 		protected int frameMaxX;
 		protected int frameMaxY;
-		protected int minBlobWidth = 10;
+		protected int minBlobWidth = 20;
 		protected int minBlobHeight = 10;
-		protected double maxSegmentLength = 4.0;
-		protected double stepSize = 1.0;
+		protected double maxSegmentLength = 10.0;
+		protected double stepSize = 4.0;
 
 		/**
 		 * @return the step size
@@ -273,6 +277,9 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 			return maxSegmentLength;
 		}
 
+		/**
+		 * Set the max segment length.
+		 */
 		public ContourTracerParams setMaxSegmentLength(double maxSegmentLength) {
 			this.maxSegmentLength = maxSegmentLength;
 			return this;

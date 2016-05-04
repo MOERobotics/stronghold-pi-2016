@@ -57,6 +57,7 @@ public class MJPEGServer implements Runnable {
 	 */
 	public static final ByteBuffer HTTP_SSE_HEAD;
 	
+	//load HTTP files into RAM
 	static {
 		HTTP_PAGE_MAIN = loadHttp("main");
 		HTTP_PAGE_404 = loadHttp("404");
@@ -90,21 +91,59 @@ public class MJPEGServer implements Runnable {
 	
 	ServerSocketChannel serverSocket;
 	Selector selector;
+	/**
+	 * The socket to bind to. Should be <kbd>localhost:port</kbd>.
+	 */
 	SocketAddress address;
+	/**
+	 * Service to spawn new threads on.
+	 */
 	ExecutorService executor;
+	/**
+	 * The latest channel ID. Each channel has a unique ID, and this uses atomic operations to
+	 * ensure that holds true.
+	 */
 	protected AtomicLong channelId = new AtomicLong(0);
+	/**
+	 * ByteBuffer to read requests into. Larger requests will be truncated (I think).
+	 */
 	protected ByteBuffer readBuffer = ByteBuffer.allocateDirect(1024 * 10);
 	/**
 	 * Buffer for queuing frames to be written in
 	 */
 	protected ByteBuffer jpegWriteBuffer = ByteBuffer.allocateDirect(1024 * 100);
+	/**
+	 * Whether a thread has locked the jpegWriteBuffer. Allows for non-blocking locks.
+	 */
 	protected AtomicBoolean isJpegBufferLocked = new AtomicBoolean(false);
+	/**
+	 * Whether the data in {@link #jpegWriteBuffer} has been updated since the last write.
+	 */
 	protected AtomicBoolean isImageAvailable = new AtomicBoolean(false);
+	/**
+	 * SSE data stream. For sending overlays to any attached clients.
+	 */
 	protected volatile ByteBuffer rectangleWriteBuffer = null;
+	/**
+	 * Whether any rectangles are there.
+	 */
 	protected AtomicBoolean areRectanglesAvailable = new AtomicBoolean(false);
+	/**
+	 * A map connecting channel IDs to the channels. All open SocketChannels should be in this map,
+	 * so you can store their IDs.
+	 */
 	protected ConcurrentHashMap<Long, SocketChannel> channelMap = new ConcurrentHashMap<>();
+	/**
+	 * Channels that have requested a MJPEG stream.
+	 */
 	protected volatile Set<Long> mjpegChannels = ConcurrentHashMap.newKeySet();
+	/**
+	 * Channels that have requested a SSE stream.
+	 */
 	protected volatile Set<Long> jsonSSEChannels = ConcurrentHashMap.newKeySet();
+	/**
+	 * Controls the server thread. Set to false to stop the thread.
+	 */
 	protected AtomicBoolean shouldBeRunning = new AtomicBoolean(false);
 
 	/**
@@ -201,7 +240,10 @@ public class MJPEGServer implements Runnable {
 			isJpegBufferLocked.compareAndSet(true, false);
 		}
 	}
-	
+	/**
+	 * Offer a set of rectangles to be served in the SSE stream.
+	 * @param rectangles set of rectangles to serve
+	 */
 	public void offerRectangles(List<PreciseRectangle> rectangles) {
 		if (jsonSSEChannels.size() == 0)
 			//Don't waste time on building the data, if nobody's there to listen
@@ -221,6 +263,10 @@ public class MJPEGServer implements Runnable {
 		rectangleWriteBuffer = ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8));
 		areRectanglesAvailable.set(true);
 	}
+	/**
+	 * Offer a set of polygons to be served in the SSE stream.
+	 * @param polygons set of polygons to serve
+	 */
 	public void offerPolygons(List<Polygon> polygons) {
 		if (jsonSSEChannels.size() == 0)
 			//Don't waste time on building the data, if nobody's there to listen
@@ -244,6 +290,10 @@ public class MJPEGServer implements Runnable {
 		areRectanglesAvailable.set(true);
 		System.out.println("Pushed polygons");
 	}
+	/**
+	 * Attempt to write the current SSE data to the requesting streams,
+	 * if the data has changed since its last method call.
+	 */
 	protected void attemptUpdateSSE() {
 		if (this.jsonSSEChannels.isEmpty() || (!areRectanglesAvailable.get()))
 			return;
@@ -269,6 +319,10 @@ public class MJPEGServer implements Runnable {
 			areRectanglesAvailable.set(false);
 		}
 	}
+	/**
+	 * Attempt to write the next MJPEG frame to its requesting channels,
+	 * if the data has updated since its last call.
+	 */
 	protected void attemptWriteNextFrame() {
 		if (this.mjpegChannels.size() == 0 || !(this.isImageAvailable.get() && isJpegBufferLocked.compareAndSet(false, true)))
 			return;
@@ -296,7 +350,7 @@ public class MJPEGServer implements Runnable {
 			isJpegBufferLocked.set(false);
 		}
 	}
-
+	
 	private void accept(SelectionKey key) throws IOException {
 		SocketChannel socket = serverSocket.accept();
 		System.out.println("Accepting socket from " + socket.socket().getInetAddress());
@@ -387,6 +441,10 @@ public class MJPEGServer implements Runnable {
 			channelMap.remove(id);
 		}
 	}
+	/**
+	 * Attempt to stop the server.
+	 * @throws IOException if an I/O error occurred during the shutdown attempt
+	 */
 	public void shutdown() throws IOException {
 		this.shouldBeRunning.set(false);
 		for (SocketChannel channel : channelMap.values())

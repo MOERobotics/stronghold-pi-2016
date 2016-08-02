@@ -21,8 +21,17 @@ import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
  */
 public class CommandLineParser implements Serializable, Function<String[], ParsedCommandLineArguments> {
 	private static final long serialVersionUID = 4501136312997123150L;
+	/**
+	 * The message object to display how to use the command. Currently not implemented.
+	 */
 	protected CommandLineUsage usage = new CommandLineUsage();
+	/**
+	 * The stored option (i.e., flag) signatures
+	 */
 	protected HashMap<String, CommandLineToken> options;
+	/**
+	 * A map generated of all of the aliases and their mappings, for faster lookup
+	 */
 	protected transient HashMap<String, Set<String>> aliases;
 	
 	public static Builder builder() {
@@ -32,6 +41,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 	protected CommandLineParser() {
 		
 	}
+	
 	protected CommandLineParser(HashMap<String, CommandLineToken> options) {
 		this.options = options;
 	}
@@ -99,6 +109,9 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		return new ParsedCommandLineArguments(data);
 	}
 	
+	/**
+	 * Get the set of aliases that are mapped to a given name.
+	 */
 	@SuppressWarnings("unchecked")
 	public Set<String> getAliasesFor(String name) {
 		if (this.aliases == null) {
@@ -117,6 +130,10 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		return this.aliases.getOrDefault(name, Collections.EMPTY_SET);
 	}
 	
+	/**
+	 * A map of the command line arguments to their given values, with
+	 * features such as conversion between primitive types
+	 */
 	public class ParsedCommandLineArguments {
 		HashMap<String, String> data;
 		protected ParsedCommandLineArguments(HashMap<String, String> data) {
@@ -153,15 +170,33 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 	 */
 	public static class Builder {
 		protected HashMap<String, CommandLineToken> options = new HashMap<>();
+		/**
+		 * Creates an empty Builder
+		 */
 		public Builder() {
 			
 		}
+		
+		/**
+		 * Creates a clone of a given builder
+		 * @param src The builder to clone
+		 */
 		public Builder(Builder src) {
 			this.options = new HashMap<>(src.options);
 		}
+		/**
+		 * Makes a clone of this Builder, if you want to do that for some reason.
+		 * @return self
+		 */
 		public Builder clone() {
 			return new Builder(this);
 		}
+		/**
+		 * Add a boolean flag.
+		 * @param name The flag's name
+		 * @param description A description of what the flag does
+		 * @return self
+		 */
 		public Builder addFlag(String name, String description) {
 			options.put(name, new CommandLineFlag(name, description));
 			return this;
@@ -176,10 +211,22 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 			options.put(from, new CommandLineAlias(from, to));
 			return this;
 		}
+		/**
+		 * Register a key-value pair. Key-value pair flags are flags in the format of
+		 * <kbd>--flag [value]</kbd>. 
+		 * @param name The name of the flag (what is used to set this)
+		 * @param argName the name of the value (for description only)
+		 * @param description A description of what the flag does
+		 * @return self
+		 */
 		public Builder addKvPair(String name, String argName, String description) {
 			options.put(name, new CommandLineKVPair(name, argName, description));
 			return this;
 		}
+		/**
+		 * Builds a CommandLineParser
+		 * @return built object
+		 */
 		public CommandLineParser build() {
 			return new CommandLineParser(this);
 		}
@@ -195,9 +242,13 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 	}
 	
 	/**
+	 * The type of command line token.
 	 * @author mailmindlin
 	 */
 	public enum CommandLineTokenType {
+		/**
+		 * Denotes an alias token
+		 */
 		ALIAS,
 		FLAG,
 		KV_PAIR
@@ -218,7 +269,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		 */
 		protected String targetName;
 		
-		public CommandLineAlias() {
+		protected CommandLineAlias() {
 			
 		}
 		
@@ -322,9 +373,9 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		}
 		@Override
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-			name = in.readUTF();
-			description = in.readUTF();
-			fieldName = in.readUTF();
+			this.name = in.readUTF();
+			this.description = in.readUTF();
+			this.fieldName = in.readUTF();
 		}
 		@Override
 		public void writeExternal(ObjectOutput out) throws IOException {

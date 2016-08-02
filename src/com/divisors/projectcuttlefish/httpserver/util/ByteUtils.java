@@ -3,9 +3,8 @@ package com.divisors.projectcuttlefish.httpserver.util;
 import java.nio.ByteBuffer;
 
 /**
- * 
+ * Utilities for working with ByteBuffers. This class was developed to deal with HTTP requests that are recieved from NIO sockets.
  * @author mailmindlin
- *
  */
 public class ByteUtils {
 	/**

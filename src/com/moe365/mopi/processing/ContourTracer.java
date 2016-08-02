@@ -41,7 +41,7 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 		this.minBlobWidth = params.getMinBlobWidth();
 		this.minBlobHeight = params.getMinBlobHeight();
 		this.maxSegmentLength = params.getMaxSegmentLength();
-		this.stepSize = params.getStepSize();w
+		this.stepSize = params.getStepSize();
 	}
 	@Override
 	public List<Polygon> apply(VideoFrame frameOn, VideoFrame frameOff) {

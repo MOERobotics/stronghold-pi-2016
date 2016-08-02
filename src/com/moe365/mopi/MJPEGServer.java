@@ -371,6 +371,13 @@ public class MJPEGServer implements Runnable {
 		socket.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, id);
 	}
 
+	/**
+	 * Process a socket marked as available to read.
+	 * It is assumed that all of the HTTP request is available immediately (Multipart is not supported). As such,
+	 * the response is either immediately written to the socket (and the channel is closed), or the channel is added to one
+	 * of the streaming lists.
+	 * @param key The selection key for the socket to be read
+	 */
 	private void read(SelectionKey key) throws IOException {
 		long id = (long) key.attachment();
 		SocketChannel channel = channelMap.get(id);

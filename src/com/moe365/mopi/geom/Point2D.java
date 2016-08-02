@@ -8,7 +8,7 @@ import java.io.ObjectOutput;
 import com.moe365.mopi.util.ReflectionUtils;
 
 /**
- * 
+ * A 2D point. This class uses doubles, so it has better range & accuracy, when compared to integer points.
  * @author mailmindlin
  */
 public class Point2D implements Externalizable, Cloneable {
@@ -60,22 +60,37 @@ public class Point2D implements Externalizable, Cloneable {
 	public Point2D abs() {
 		return new Point2D(Math.abs(getX()), Math.abs(getY()));
 	}
-
+	
+	/**
+	 * Get the slope from this point to the other point.
+	 * @return slope
+	 */
 	public double getSlopeTo(Point2D other) {
 		return (other.getY() - getY()) / (other.getX() - getX());
 	}
 
+	/**
+	 * Get the point immediately between this and another point.
+	 * @param other the other point
+	 * @return the midpoint
+	 */
 	public Point2D getMidpoint(Point2D other) {
 		return new Point2D(.5 * (getX() + other.getX()), .5 * (getY() + other.getY()));
 	}
 
+	/**
+	 * Get the midpoint, relative to this point.
+	 * @param other the other point
+	 * @return the midpoint offset
+	 */
 	public Point2D getMidpointOffset(Point2D other) {
 		return new Point2D(.5 * (other.getX() - getX()), .5 * (other.getY() - getY()));
 	}
 
 	/**
 	 * Essentially <code>{@link #getDistance(Point2D)}^2</code>. Because this
-	 * method does not require a square root operation, it is much faster.
+	 * method does not require a square root operation, it is 
+	 * <span title="Because of hardware optimization"><del>much</del> <ins>somewhat</ins></span> faster.
 	 * 
 	 * @param other
 	 * @return distance squared
@@ -94,6 +109,13 @@ public class Point2D implements Externalizable, Cloneable {
 		return Math.sqrt(getDistanceSquared(other));
 	}
 
+	/**
+	 * Gets the <a href="en.wikipedia.org/wiki/Taxicab_geometry">taxicab distance</a> between this point
+	 * and another point. This has the advantage of being a bit faster (no multiplication/square root ops) to
+	 * calculate than the normal distance.
+	 * @param other The other point
+	 * @return the distance
+	 */-
 	public double getTaxicabDistance(Point2D other) {
 		return Math.abs(getX() - other.getX()) + Math.abs(getY() - other.getY());
 	}

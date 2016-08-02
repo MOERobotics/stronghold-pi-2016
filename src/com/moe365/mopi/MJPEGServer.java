@@ -351,6 +351,11 @@ public class MJPEGServer implements Runnable {
 		}
 	}
 	
+	/**
+	 * Accept a selection key. This is called after a new client connects to
+	 * the server. This gets the new socket, configures it, and stores it in {@link #channelMap}.
+	 * @param key The selection key for the new connection
+	 */
 	private void accept(SelectionKey key) throws IOException {
 		SocketChannel socket = serverSocket.accept();
 		System.out.println("Accepting socket from " + socket.socket().getInetAddress());

@@ -115,7 +115,7 @@ public class Point2D implements Externalizable, Cloneable {
 	 * calculate than the normal distance.
 	 * @param other The other point
 	 * @return the distance
-	 */-
+	 */
 	public double getTaxicabDistance(Point2D other) {
 		return Math.abs(getX() - other.getX()) + Math.abs(getY() - other.getY());
 	}

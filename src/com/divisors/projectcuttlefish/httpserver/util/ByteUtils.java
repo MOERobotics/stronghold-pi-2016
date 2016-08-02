@@ -3,9 +3,8 @@ package com.divisors.projectcuttlefish.httpserver.util;
 import java.nio.ByteBuffer;
 
 /**
- * 
+ * Utilities for working with ByteBuffers. This class was developed to deal with HTTP requests that are recieved from NIO sockets.
  * @author mailmindlin
- *
  */
 public class ByteUtils {
 	/**
@@ -77,11 +76,16 @@ public class ByteUtils {
 		 * @return success
 		 */
 		public boolean put(int...bytes) {
-			byte[] arr = new byte[bytes.length];
-			for (int i=0;i<bytes.length;i++)
-				arr[i]=(byte)bytes[i];
+			final byte[] arr = new byte[bytes.length];
+			for (int i = 0; i < bytes.length; i++)
+				arr[i] = (byte)bytes[i];
 			return this.put(arr);
 		}
+		/**
+		 * Put given bytes in buffer.
+		 * @param buf data to put in
+		 * @return success
+		 */
 		public boolean put(ByteBuffer buf) {
 			try {
 				buffer.put(buf);
@@ -91,6 +95,10 @@ public class ByteUtils {
 				return false;
 			}
 		}
+		/**
+		 * Resets this' buffer
+		 * @return self
+		 */
 		public ByteBufferTokenizer clear() {
 			synchronized (buffer) {
 				this.buffer.clear();

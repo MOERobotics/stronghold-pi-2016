@@ -351,21 +351,34 @@ public class MJPEGServer implements Runnable {
 		}
 	}
 	
+	/**
+	 * Accept a selection key. This is called after a new client connects to
+	 * the server. This gets the new socket, configures it, and stores it in {@link #channelMap}.
+	 * @param key The selection key for the new connection
+	 */
 	private void accept(SelectionKey key) throws IOException {
 		SocketChannel socket = serverSocket.accept();
 		System.out.println("Accepting socket from " + socket.socket().getInetAddress());
 
-		// setup socket
+		// Setup socket
 		socket.configureBlocking(false);
 		socket.setOption(StandardSocketOptions.SO_KEEPALIVE, true);
 		socket.setOption(StandardSocketOptions.TCP_NODELAY, true);
 
+		// Register socket
 		long id = this.channelId.incrementAndGet();
 		this.channelMap.put(id, socket);
 
 		socket.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, id);
 	}
 
+	/**
+	 * Process a socket marked as available to read.
+	 * It is assumed that all of the HTTP request is available immediately (Multipart is not supported). As such,
+	 * the response is either immediately written to the socket (and the channel is closed), or the channel is added to one
+	 * of the streaming lists.
+	 * @param key The selection key for the socket to be read
+	 */
 	private void read(SelectionKey key) throws IOException {
 		long id = (long) key.attachment();
 		SocketChannel channel = channelMap.get(id);
@@ -413,7 +426,12 @@ public class MJPEGServer implements Runnable {
 			channel.write(tmp);
 			channel.close();
 		} else if (header[1].endsWith("pvsn")) {
-			//Enable PeopleVision (tm)
+			/*
+			 * Enable PeopleVision (tm)
+			 * PeopleVision is a mode that changes some camera filters (increases exposure) and
+			 * disables the blinking light/image processing, so that people can use the camera
+			 * feed more easily.
+			 */
 			Main.disableProcessor(this);
 			channel.write(MJPEGServer.HTTP_PAGE_200.duplicate());
 			ByteBuffer tmp = ByteBuffer.allocate(4);
@@ -421,6 +439,7 @@ public class MJPEGServer implements Runnable {
 			channel.write(tmp);
 			channel.close();
 		} else if (header[1].endsWith("results.sse")) {
+			//Register this channel as a SSE client
 			System.out.println("Rectangle SSE stream");
 			channel.write(MJPEGServer.HTTP_SSE_HEAD.duplicate());
 			jsonSSEChannels.add(id);

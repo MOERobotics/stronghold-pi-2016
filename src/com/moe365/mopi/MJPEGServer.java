@@ -360,11 +360,12 @@ public class MJPEGServer implements Runnable {
 		SocketChannel socket = serverSocket.accept();
 		System.out.println("Accepting socket from " + socket.socket().getInetAddress());
 
-		// setup socket
+		// Setup socket
 		socket.configureBlocking(false);
 		socket.setOption(StandardSocketOptions.SO_KEEPALIVE, true);
 		socket.setOption(StandardSocketOptions.TCP_NODELAY, true);
 
+		// Register socket
 		long id = this.channelId.incrementAndGet();
 		this.channelMap.put(id, socket);
 
@@ -425,7 +426,12 @@ public class MJPEGServer implements Runnable {
 			channel.write(tmp);
 			channel.close();
 		} else if (header[1].endsWith("pvsn")) {
-			//Enable PeopleVision (tm)
+			/*
+			 * Enable PeopleVision (tm)
+			 * PeopleVision is a mode that changes some camera filters (increases exposure) and
+			 * disables the blinking light/image processing, so that people can use the camera
+			 * feed more easily.
+			 */
 			Main.disableProcessor(this);
 			channel.write(MJPEGServer.HTTP_PAGE_200.duplicate());
 			ByteBuffer tmp = ByteBuffer.allocate(4);
@@ -433,6 +439,7 @@ public class MJPEGServer implements Runnable {
 			channel.write(tmp);
 			channel.close();
 		} else if (header[1].endsWith("results.sse")) {
+			//Register this channel as a SSE client
 			System.out.println("Rectangle SSE stream");
 			channel.write(MJPEGServer.HTTP_SSE_HEAD.duplicate());
 			jsonSSEChannels.add(id);

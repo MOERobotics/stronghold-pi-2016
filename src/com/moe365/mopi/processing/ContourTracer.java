@@ -219,15 +219,26 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 			return this;
 		}
 
+		/**
+		 * @return The minimum x value that this ContourTracer will search within
+		 */
 		public int getFrameMinX() {
 			return frameMinX;
 		}
 
-		public ContourTracerParams setFrameMinX(int frameWidth) {
-			this.frameMinX = frameWidth;
+		/**
+		 * Set the minimum x value that this ContourTracer will search within
+		 * @param value Value to set it to
+		 * @return self
+		 */
+		public ContourTracerParams setFrameMinX(int value) {
+			this.frameMinX = value;
 			return this;
 		}
-
+		
+		/**
+		 * @return The minimum y value that this ContourTracer will search within
+		 */
 		public int getFrameMinY() {
 			return frameMinY;
 		}
@@ -237,10 +248,21 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 			return this;
 		}
 
+		/**
+		 * Get the minimum with of a blob that is considered valid. Blobs with a smaller
+		 * width will be discarded
+		 * @return The minimum valid blob width
+		 */
 		public int getMinBlobWidth() {
 			return minBlobWidth;
 		}
 
+		/**
+		 * Set the minimum with of a blob that is considered valid. Blobs with a smaller
+		 * width will be discarded
+		 * @param minBlobWidth New value
+		 * @return self
+		 */
 		public ContourTracerParams setMinBlobWidth(int minBlobWidth) {
 			this.minBlobWidth = minBlobWidth;
 			return this;

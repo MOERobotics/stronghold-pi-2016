@@ -2,7 +2,6 @@ package com.moe365.mopi.util;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.function.Consumer;
 
 /**
  * Utility for reflections, most used for implementing Externalizable.
@@ -48,18 +47,58 @@ public class ReflectionUtils {
 			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		applyOnField(obj.getClass(), fieldName, field->field.setDouble(obj, value));
 	}
+	
+	/**
+	 * Set an int field on the given object
+	 * @param obj
+	 * @param fieldName
+	 * @param value
+	 * @throws NoSuchFieldException
+	 * @throws IllegalArgumentException
+	 * @throws IllegalAccessException
+	 */
 	public static void setInt(Object obj, String fieldName, int value)
 			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		applyOnField(obj.getClass(), fieldName, field->field.setInt(obj, value));
 	}
+	
+	/**
+	 * Set a float field on the given object
+	 * @param obj
+	 * @param fieldName
+	 * @param value
+	 * @throws NoSuchFieldException
+	 * @throws IllegalArgumentException
+	 * @throws IllegalAccessException
+	 */
 	public static void setFloat(Object obj, String fieldName, float value)
 			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		applyOnField(obj.getClass(), fieldName, field->field.setFloat(obj, value));
 	}
+	
+	/**
+	 * Set a long field on athegiven object
+	 * @param obj
+	 * @param fieldName
+	 * @param value
+	 * @throws NoSuchFieldException
+	 * @throws IllegalArgumentException
+	 * @throws IllegalAccessException
+	 */
 	public static void setLong(Object obj, String fieldName, long value)
 			throws NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		applyOnField(obj.getClass(), fieldName, field->field.setLong(obj, value));
 	}
+	
+	/**
+	 * Apply an operation on a field of a class. Useful for getting/setting protected/final fields.
+	 * @param clazz
+	 * @param fieldName
+	 * @param action
+	 * @throws IllegalArgumentException
+	 * @throws IllegalAccessException
+	 * @throws NoSuchFieldException
+	 */
 	public static void applyOnField(Class<?> clazz, String fieldName, FieldOperator action) throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
 		Field field;
 		try {

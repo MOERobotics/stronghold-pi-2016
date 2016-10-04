@@ -91,6 +91,9 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 		return this;
 	}
 	
+	/**
+	 * Stop this processor from processing more images
+	 */
 	@SuppressWarnings("deprecation")
 	public void stop() {
 		thread.stop();
@@ -176,5 +179,6 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	 * @param frameOff A frame that was taken without a flash
 	 * @return generated data
 	 */
+	@Override
 	public abstract R apply(VideoFrame frameOn, VideoFrame frameOff);
 }

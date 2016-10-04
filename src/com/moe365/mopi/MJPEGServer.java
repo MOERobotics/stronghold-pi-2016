@@ -32,26 +32,32 @@ import au.edu.jcu.v4l4j.VideoFrame;
  * @since 0.0.1
  */
 public class MJPEGServer implements Runnable {
+	
 	/**
 	 * Main HTTP page (HTML) bytes
 	 */
 	public static final ByteBuffer HTTP_PAGE_MAIN;
+	
 	/**
 	 * 404 page bytes
 	 */
 	public static final ByteBuffer HTTP_PAGE_404;
+	
 	/**
 	 * MJPEG header (sent at the top of the response) bytes
 	 */
 	public static final ByteBuffer HTTP_HEAD_MJPEG;
+	
 	/**
 	 * MJPEG frame header (sent before each frame) bytes
 	 */
 	public static final ByteBuffer HTTP_FRAME_MJPEG;
+	
 	/**
 	 * Generic 200 OK response bytes
 	 */
 	public static final ByteBuffer HTTP_PAGE_200;
+	
 	/**
 	 * SSE header (sent at the top of the response) bytes.
 	 */
@@ -66,6 +72,7 @@ public class MJPEGServer implements Runnable {
 		HTTP_PAGE_200 = loadHttp("200");
 		HTTP_SSE_HEAD = loadHttp("sse-head");
 	}
+	
 	/**
 	 * Load file from the <code>resources</code> package inside the jar.
 	 * @param name name of file
@@ -90,57 +97,71 @@ public class MJPEGServer implements Runnable {
 	}
 	
 	ServerSocketChannel serverSocket;
+	
 	Selector selector;
+	
 	/**
 	 * The socket to bind to. Should be <kbd>localhost:port</kbd>.
 	 */
 	SocketAddress address;
+	
 	/**
 	 * Service to spawn new threads on.
 	 */
 	ExecutorService executor;
+	
 	/**
 	 * The latest channel ID. Each channel has a unique ID, and this uses atomic operations to
 	 * ensure that holds true.
 	 */
 	protected AtomicLong channelId = new AtomicLong(0);
+	
 	/**
 	 * ByteBuffer to read requests into. Larger requests will be truncated (I think).
 	 */
 	protected ByteBuffer readBuffer = ByteBuffer.allocateDirect(1024 * 10);
+	
 	/**
 	 * Buffer for queuing frames to be written in
 	 */
 	protected ByteBuffer jpegWriteBuffer = ByteBuffer.allocateDirect(1024 * 100);
+	
 	/**
 	 * Whether a thread has locked the jpegWriteBuffer. Allows for non-blocking locks.
 	 */
 	protected AtomicBoolean isJpegBufferLocked = new AtomicBoolean(false);
+	
 	/**
 	 * Whether the data in {@link #jpegWriteBuffer} has been updated since the last write.
 	 */
 	protected AtomicBoolean isImageAvailable = new AtomicBoolean(false);
+	
 	/**
 	 * SSE data stream. For sending overlays to any attached clients.
 	 */
 	protected volatile ByteBuffer rectangleWriteBuffer = null;
+	
 	/**
 	 * Whether any rectangles are there.
 	 */
 	protected AtomicBoolean areRectanglesAvailable = new AtomicBoolean(false);
+	
 	/**
 	 * A map connecting channel IDs to the channels. All open SocketChannels should be in this map,
 	 * so you can store their IDs.
 	 */
 	protected ConcurrentHashMap<Long, SocketChannel> channelMap = new ConcurrentHashMap<>();
+	
 	/**
 	 * Channels that have requested a MJPEG stream.
 	 */
 	protected volatile Set<Long> mjpegChannels = ConcurrentHashMap.newKeySet();
+	
 	/**
 	 * Channels that have requested a SSE stream.
 	 */
 	protected volatile Set<Long> jsonSSEChannels = ConcurrentHashMap.newKeySet();
+	
 	/**
 	 * Controls the server thread. Set to false to stop the thread.
 	 */
@@ -240,6 +261,7 @@ public class MJPEGServer implements Runnable {
 			isJpegBufferLocked.compareAndSet(true, false);
 		}
 	}
+	
 	/**
 	 * Offer a set of rectangles to be served in the SSE stream.
 	 * @param rectangles set of rectangles to serve
@@ -263,6 +285,7 @@ public class MJPEGServer implements Runnable {
 		rectangleWriteBuffer = ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8));
 		areRectanglesAvailable.set(true);
 	}
+	
 	/**
 	 * Offer a set of polygons to be served in the SSE stream.
 	 * @param polygons set of polygons to serve
@@ -290,6 +313,7 @@ public class MJPEGServer implements Runnable {
 		areRectanglesAvailable.set(true);
 		System.out.println("Pushed polygons");
 	}
+	
 	/**
 	 * Attempt to write the current SSE data to the requesting streams,
 	 * if the data has changed since its last method call.
@@ -319,6 +343,7 @@ public class MJPEGServer implements Runnable {
 			areRectanglesAvailable.set(false);
 		}
 	}
+	
 	/**
 	 * Attempt to write the next MJPEG frame to its requesting channels,
 	 * if the data has updated since its last call.
@@ -460,6 +485,7 @@ public class MJPEGServer implements Runnable {
 			channelMap.remove(id);
 		}
 	}
+	
 	/**
 	 * Attempt to stop the server.
 	 * @throws IOException if an I/O error occurred during the shutdown attempt
@@ -474,6 +500,7 @@ public class MJPEGServer implements Runnable {
 		this.selector.close();
 		this.serverSocket.close();
 	}
+	
 	/**
 	 * Parse byte array into HTTP header
 	 * @param data

@@ -3,6 +3,7 @@ package com.moe365.mopi.geom;
 /**
  * A set of points that create a polygon. The set of points (should) be
  * circularly- and doubly-linked.
+ * 
  * @author mailmindlin
  */
 public class Polygon {
@@ -23,18 +24,24 @@ public class Polygon {
 	 * The last calculated bounding box. Null if not valid anymore.
 	 */
 	protected PreciseRectangle bounds;
+	
 	/**
 	 * Create a polygon starting at the given coordinates
-	 * @param x x-coordinate
-	 * @param y y-coordinate
+	 * 
+	 * @param x
+	 *            x-coordinate
+	 * @param y
+	 *            y-coordinate
 	 */
 	public Polygon(double x, double y) {
 		this.start = new PointNode(x, y);
 		this.start.next = start;
 		this.start.prev = start;
 	}
+	
 	/**
 	 * A doubly-linked point.
+	 * 
 	 * @author mailmindlin
 	 */
 	public class PointNode extends Point2D {
@@ -46,47 +53,66 @@ public class Polygon {
 		 * The previous node
 		 */
 		protected PointNode prev;
+		
 		/**
 		 * Create an empty node (for deserialization; do not use)
 		 */
 		public PointNode() {
 			
 		}
+		
 		/**
 		 * Create an orphaned node at the given coordinates.
-		 * @param x x-coordinate
-		 * @param y y-coordinate
+		 * 
+		 * @param x
+		 *            x-coordinate
+		 * @param y
+		 *            y-coordinate
 		 */
 		public PointNode(double x, double y) {
 			super(x, y);
 		}
+		
 		/**
-		 * Create a node at the given coordinates immediately after <code>prev</code>
-		 * @param prev preceding node
-		 * @param x x-coordinate
-		 * @param y y-coordinate
+		 * Create a node at the given coordinates immediately after
+		 * <code>prev</code>
+		 * 
+		 * @param prev
+		 *            preceding node
+		 * @param x
+		 *            x-coordinate
+		 * @param y
+		 *            y-coordinate
 		 */
 		public PointNode(PointNode prev, double x, double y) {
 			this(x, y);
 			this.prev = prev;
 		}
+		
 		/**
 		 * Create a node.
-		 * @param prev preceding node
-		 * @param x x-coordinate
-		 * @param y y-coordinate
-		 * @param next next node
+		 * 
+		 * @param prev
+		 *            preceding node
+		 * @param x
+		 *            x-coordinate
+		 * @param y
+		 *            y-coordinate
+		 * @param next
+		 *            next node
 		 */
 		public PointNode(PointNode prev, double x, double y, PointNode next) {
 			this(prev, x, y);
 			this.next = next;
 		}
+		
 		/**
 		 * Get the next node in the series.
 		 */
 		public PointNode next() {
 			return next;
 		}
+		
 		/**
 		 * Gets the next node, if it is not null.
 		 */
@@ -95,11 +121,14 @@ public class Polygon {
 				return this;
 			return next;
 		}
+		
 		/**
-		 * Insert a node with the given coordinates immediately
-		 * after this node.
-		 * @param x x coordinate of the node to insert
-		 * @param y y coordinate of the node to insert
+		 * Insert a node with the given coordinates immediately after this node.
+		 * 
+		 * @param x
+		 *            x coordinate of the node to insert
+		 * @param y
+		 *            y coordinate of the node to insert
 		 * @return created node
 		 */
 		public PointNode insertNext(double x, double y) {
@@ -109,9 +138,12 @@ public class Polygon {
 			this.next = node;
 			return node;
 		}
+		
 		/**
 		 * Insert the given node immediately after this one.
-		 * @param node to insert
+		 * 
+		 * @param node
+		 *            to insert
 		 * @return inserted node
 		 */
 		public PointNode insertNext(PointNode node) {
@@ -122,11 +154,15 @@ public class Polygon {
 			node.prev = this;
 			return node;
 		}
+		
 		/**
-		 * Insert a node with the given coordinates immediately
-		 * before this node.
-		 * @param x x coordinate of the node to insert
-		 * @param y y coordinate of the node to insert
+		 * Insert a node with the given coordinates immediately before this
+		 * node.
+		 * 
+		 * @param x
+		 *            x coordinate of the node to insert
+		 * @param y
+		 *            y coordinate of the node to insert
 		 * @return created node
 		 */
 		public PointNode insertBefore(double x, double y) {
@@ -136,9 +172,12 @@ public class Polygon {
 			this.prev = node;
 			return node;
 		}
+		
 		/**
 		 * Insert the given node immediately before this one.
-		 * @param node to insert
+		 * 
+		 * @param node
+		 *            to insert
 		 * @return inserted node
 		 */
 		public PointNode insertBefore(PointNode node) {
@@ -149,16 +188,20 @@ public class Polygon {
 			node.next = this;
 			return node;
 		}
+		
 		/**
 		 * Remove the next node by calling <code>this.next().remove()</code>.
+		 * 
 		 * @return self
 		 */
 		public PointNode removeNext() {
 			next.remove();
 			return this;
 		}
+		
 		/**
 		 * Remove this node from the chain.
+		 * 
 		 * @return the next node
 		 */
 		public PointNode remove() {
@@ -169,11 +212,15 @@ public class Polygon {
 				start = this.next;
 			return this.next;
 		}
+		
 		/**
-		 * 'Set' the value of this node by removing it and inserting
-		 * a new node with the given coordinates.
-		 * @param x x coordinate of the new node
-		 * @param y y coordinate of the new node
+		 * 'Set' the value of this node by removing it and inserting a new node
+		 * with the given coordinates.
+		 * 
+		 * @param x
+		 *            x coordinate of the new node
+		 * @param y
+		 *            y coordinate of the new node
 		 * @return the new node
 		 */
 		public PointNode set(double x, double y) {
@@ -186,6 +233,7 @@ public class Polygon {
 			return node;
 		}
 	}
+	
 	/**
 	 * Mark this polygon as having been modified, clearing previously calculated
 	 * values.
@@ -194,16 +242,19 @@ public class Polygon {
 		this.bounds = null;
 		this.modified = true;
 	}
+	
 	/**
 	 * Add point to the end of the polygon chain.
 	 */
 	public void addPoint(double x, double y) {
 		start.insertBefore(x, y);
 	}
+	
 	/**
-	 * Calculate the area of the polygon. If this method is called
-	 * multiple times without changing any of the points between method calls,
-	 * it will return its previous value.
+	 * Calculate the area of the polygon. If this method is called multiple
+	 * times without changing any of the points between method calls, it will
+	 * return its previous value.
+	 * 
 	 * @return the area of this polygon
 	 */
 	public double getArea() {
@@ -219,10 +270,12 @@ public class Polygon {
 		}
 		return area;
 	}
+	
 	/**
 	 * Convert this rectangle to a bounding box. If this method is called
 	 * multiple times without changing any of the points between method calls,
 	 * it will return its previous value.
+	 * 
 	 * @return bounding box
 	 */
 	public PreciseRectangle getBoundingBox() {
@@ -245,14 +298,17 @@ public class Polygon {
 		}
 		return bounds;
 	}
+	
 	/**
 	 * Get the starting point
+	 * 
 	 * @return the starting point
 	 * @see #start
 	 */
 	public PointNode getStartingPoint() {
 		return start;
 	}
+	
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder("[");

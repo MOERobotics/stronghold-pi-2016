@@ -13,24 +13,29 @@ import com.moe365.mopi.util.ReflectionUtils;
 
 /**
  * Like a Rectangle, but immutable, and double precision.
+ * 
  * @since April 2016
  * @author mailmindlin
  */
 public class PreciseRectangle implements Externalizable {
 	protected final double x, y, width, height;
 	protected transient int hash = 0;
+	
 	public static Function<PreciseRectangle, PreciseRectangle> scalar(double xf, double yf, double wf, double hf) {
 		return rectangle -> (rectangle.scale(xf, yf, wf, hf));
 	}
+	
 	/**
 	 * For deserializing
 	 */
 	protected PreciseRectangle() {
-		this(0,0,0,0);
+		this(0, 0, 0, 0);
 	}
+	
 	public PreciseRectangle(Rectangle rect) {
 		this(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
 	}
+	
 	public PreciseRectangle(double x, double y, double width, double height) {
 		this.x = x;
 		this.y = y;
@@ -40,6 +45,7 @@ public class PreciseRectangle implements Externalizable {
 	
 	/**
 	 * Get the left offset for this rectangle
+	 * 
 	 * @return the X coordinate of the top-left corner
 	 */
 	public double getX() {
@@ -48,6 +54,7 @@ public class PreciseRectangle implements Externalizable {
 	
 	/**
 	 * Get the top offset for this rectangle
+	 * 
 	 * @return the Y coordinate of the top-left corner
 	 */
 	public double getY() {
@@ -56,6 +63,7 @@ public class PreciseRectangle implements Externalizable {
 	
 	/**
 	 * Get the width of the rectangle
+	 * 
 	 * @return the width
 	 */
 	public double getWidth() {
@@ -64,6 +72,7 @@ public class PreciseRectangle implements Externalizable {
 	
 	/**
 	 * Get this rectangle's height
+	 * 
 	 * @return the height
 	 */
 	public double getHeight() {
@@ -75,9 +84,11 @@ public class PreciseRectangle implements Externalizable {
 	}
 	
 	/**
-	 * Scale the width and height by a given factor. The top-left corner
-	 * is not changed.
-	 * @param factor the factor by which to scale
+	 * Scale the width and height by a given factor. The top-left corner is not
+	 * changed.
+	 * 
+	 * @param factor
+	 *            the factor by which to scale
 	 * @return the scaled rectangle
 	 */
 	public PreciseRectangle scale(double factor) {
@@ -86,10 +97,15 @@ public class PreciseRectangle implements Externalizable {
 	
 	/**
 	 * Scale all coordinates by the given value.
-	 * @param xf factor for the X coordinate
-	 * @param yf factor for the Y coordinate
-	 * @param wf factor for the width
-	 * @param hf factor for the height
+	 * 
+	 * @param xf
+	 *            factor for the X coordinate
+	 * @param yf
+	 *            factor for the Y coordinate
+	 * @param wf
+	 *            factor for the width
+	 * @param hf
+	 *            factor for the height
 	 * @return scaled rectangle
 	 */
 	public PreciseRectangle scale(double xf, double yf, double wf, double hf) {
@@ -115,6 +131,7 @@ public class PreciseRectangle implements Externalizable {
 		}
 		return hash;
 	}
+	
 	@Override
 	public String toString() {
 		return new StringBuilder('[')
@@ -124,6 +141,7 @@ public class PreciseRectangle implements Externalizable {
 				.append(',').append(getHeight())
 				.append(']').toString();
 	}
+	
 	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 		try {
@@ -135,6 +153,7 @@ public class PreciseRectangle implements Externalizable {
 			throw new IOException("Unable to update fields", e);
 		}
 	}
+	
 	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
 		out.writeDouble(getX());

@@ -319,59 +319,61 @@ public class Main {
 		}
 	}
 	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
-		if (args.isFlagSet("--no-process"))
+		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
-			if (args.isFlagSet("--trace-contours")) {
-				ContourTracer processor = new ContourTracer(width, height, polygons -> {
-					for (Polygon polygon : polygons) {
-						System.out.println("=> " + polygon);
-						PointNode node = polygon.getStartingPoint();
-						// Scale
-						do {
-							node = node.set(node.getX() / width, node.getY() / height);
-						} while (!(node = node.next()).equals(polygon.getStartingPoint()));
-					}
-					if (httpServer != null)
-						httpServer.offerPolygons(polygons);
+			return null;
+		}
+		
+		if (args.isFlagSet("--trace-contours")) {
+			ContourTracer processor = new ContourTracer(width, height, polygons -> {
+				for (Polygon polygon : polygons) {
+					System.out.println("=> " + polygon);
+					PointNode node = polygon.getStartingPoint();
+					// Scale
+					do {
+						node = node.set(node.getX() / width, node.getY() / height);
+					} while (!(node = node.next()).equals(polygon.getStartingPoint()));
+				}
+				if (httpServer != null)
+					httpServer.offerPolygons(polygons);
+			});
+			Main.processor = processor;
+		} else {
+			ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
+				//Filter based on AR
+				rectangles.removeIf(rectangle-> {
+					double ar = rectangle.getHeight() / rectangle.getWidth();
+					return ar < .1 || ar > 10;
 				});
-				Main.processor = processor;
-			} else {
-				ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
-					//Filter based on AR
-					rectangles.removeIf(rectangle-> {
-						double ar = rectangle.getHeight() / rectangle.getWidth();
-						return ar < .1 || ar > 10;
-					});
-					//print the rectangles' dimensions to STDOUT
-					for (PreciseRectangle rectangle : rectangles)
-						System.out.println("=> " + rectangle);
-					
-					//send the largest rectangle(s) to the Rio
-					try {
-						if (client != null) {
-							if (rectangles.isEmpty()) {
-								client.writeNoneFound();
-							} else if (rectangles.size() == 1) {
-								client.writeOneFound(rectangles.get(0));
-							} else {
-								client.writeTwoFound(rectangles.get(0), rectangles.get(1));
-							}
+				//print the rectangles' dimensions to STDOUT
+				for (PreciseRectangle rectangle : rectangles)
+					System.out.println("=> " + rectangle);
+				
+				//send the largest rectangle(s) to the Rio
+				try {
+					if (client != null) {
+						if (rectangles.isEmpty()) {
+							client.writeNoneFound();
+						} else if (rectangles.size() == 1) {
+							client.writeOneFound(rectangles.get(0));
+						} else {
+							client.writeTwoFound(rectangles.get(0), rectangles.get(1));
 						}
-					} catch (IOException | NullPointerException e) {
-						e.printStackTrace();
 					}
-					//Offer the rectangles to be put in the SSE stream
-					if (httpServer != null)
-						httpServer.offerRectangles(rectangles);
-				});
-				if (args.isFlagSet("--save-diff"))
-					processor.saveDiff = true;
-				Main.processor = processor;
-			}
-			processor.start();
-			enableProcessor();
-			return processor;
-			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
+				} catch (IOException | NullPointerException e) {
+					e.printStackTrace();
+				}
+				//Offer the rectangles to be put in the SSE stream
+				if (httpServer != null)
+					httpServer.offerRectangles(rectangles);
+			});
+			if (args.isFlagSet("--save-diff"))
+				processor.saveDiff = true;
+			Main.processor = processor;
+		}
+		Main.processor.start();
+		enableProcessor();
+		return Main.processor;
 	}
 	public static void enableProcessor() {
 		System.out.println("ENABLING CV");

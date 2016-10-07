@@ -108,6 +108,7 @@ public class Main {
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
+		// Initialize components
 		final ExecutorService executor = Executors.newCachedThreadPool();
 		
 		final MJPEGServer server = initServer(parsed, executor);
@@ -123,6 +124,8 @@ public class Main {
 		//The state of the LED. Used for timing.
 		final AtomicBoolean ledState = new AtomicBoolean(false);
 		
+		
+		// Run test, if required
 		if (parsed.isFlagSet("--test")) {
 			String target = parsed.get("--test");
 			switch (target) {
@@ -187,6 +190,7 @@ public class Main {
 			fg.startCapture();
 		}
 	}
+	
 	protected static void testClient(RoboRioClient client) throws IOException, InterruptedException {
 		System.out.println("RUNNING TEST: CLIENT");
 		//just spews out UDP packets on a 3s loop
@@ -202,6 +206,7 @@ public class Main {
 			Thread.sleep(1000);
 		}
 	}
+	
 	protected static void testSSE(MJPEGServer server) throws InterruptedException {
 		System.out.println("RUNNING TEST: SSE");
 		while (true) {
@@ -216,6 +221,7 @@ public class Main {
 			Thread.sleep(1000);
 		}
 	}
+	
 	protected static void testControls(VideoDevice device) throws ControlException, UnsupportedMethod, StateException {
 		System.out.println("RUNNING TEST: CONTROLS");
 		ControlList controls = device.getControlList();
@@ -269,6 +275,7 @@ public class Main {
 		}
 		device.releaseControlList();
 	}
+	
 	/**
 	 * Initialize the GPIO, getting the pin that the LED is attached to.
 	 * @param args parsed command line arguments
@@ -296,6 +303,19 @@ public class Main {
 		pin.setState(false);//turn it off
 		return pin;
 	}
+	
+	/**
+	 * Initializes the UDP connector to the RoboRio.
+	 * 
+	 * @param args
+	 *            Command line arguments, containing flags that modify how the
+	 *            UDP connector is set up
+	 * @param executor
+	 *            Executor to run background tasks (such as asynchronous mDNS
+	 *            resolution)
+	 * @return Rio client, or null if disabled
+	 * @throws SocketException
+	 */
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
 			System.out.println("CLIENT DISABLED");
@@ -318,6 +338,14 @@ public class Main {
 			return null;
 		}
 	}
+	
+	/**
+	 * Initialize the image processor
+	 * @param args
+	 * @param httpServer
+	 * @param client
+	 * @return Image proccessor to handle images, or null if disabled
+	 */
 	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
 		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
@@ -375,6 +403,15 @@ public class Main {
 		enableProcessor();
 		return Main.processor;
 	}
+	
+	/**
+	 * COMPUTERVISION(c)(sm): For the embetterment of computers seeing things.
+	 * <p>
+	 * Adjusts camera settings to optimize the image processing algorithms.
+	 * Mostly just drops the exposure as low as possible, and plays around with
+	 * a few other controls.
+	 * </p>
+	 */
 	public static void enableProcessor() {
 		System.out.println("ENABLING CV");
 		if (processor == null) {
@@ -406,11 +443,18 @@ public class Main {
 		}
 		processorEnabled = true;
 	}
+	
 	/**
 	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
 	 * <p>
-	 * This 
-	 * @param server 
+	 * This revolutionary technology, when enabled, embetters the vision of
+	 * people looking at a LCD displaying a sequence of images transmitted over
+	 * a network from a robot with a webcam, by disabling the computer image
+	 * processing algorithms, and playing around with the camera's controls.
+	 * When this is enabled, <strong>no image processing will be done</strong>
+	 * </p>
+	 * 
+	 * @param server
 	 */
 	public static void disableProcessor(MJPEGServer server) {
 		System.out.println("DISABLING CV");
@@ -437,10 +481,13 @@ public class Main {
 		}
 		processorEnabled = false;
 	}
+	
 	/**
-	 * Set the JPEG quality from the camera. Tests have shown that this does <b>NOT</b> reduce the
-	 * MJPEG stream's bandwidth.
-	 * @param quality quality to set. Must be 0 to 100 (inclusive)
+	 * Set the JPEG quality from the camera. Tests have shown that this does
+	 * <b>NOT</b> reduce the MJPEG stream's bandwidth.
+	 * 
+	 * @param quality
+	 *            quality to set. Must be 0 to 100 (inclusive)
 	 */
 	public static void setQuality(int quality) {
 		if (frameGrabber == null)
@@ -448,6 +495,7 @@ public class Main {
 		System.out.println("SETTING QUALITY TO " + quality);
 		frameGrabber.setJPGQuality(quality);
 	}
+	
 	/**
 	 * Create and initialize the server
 	 * @param args the command line arguments
@@ -467,10 +515,12 @@ public class Main {
 		}
 		return null;
 	}
+	
 	protected static void testConverter(VideoDevice dev) {
 		@SuppressWarnings("unused")
 		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
 	}
+	
 	/**
 	 * Binds to and initializes the camera.
 	 * @param args parsed command line arguments
@@ -492,6 +542,7 @@ public class Main {
 		System.out.println("SUCCESS");
 		return device;
 	}
+	
 	/**
 	 * Loads the CommandLineParser from inside the JAR.
 	 * @return parser.
@@ -505,6 +556,7 @@ public class Main {
 		}
 		return buildParser();
 	}
+	
 	protected static CommandLineParser buildParser() {
 		CommandLineParser parser = CommandLineParser.builder()
 			.addFlag("--help", "Displays the help message and exits")

@@ -65,7 +65,7 @@ public class ContourTracer extends AbstractImageProcessor<List<Polygon>> {
 	protected List<Polygon> tracePass1(BinaryImage image) {
 		List<Polygon> blobs = new LinkedList<Polygon>();
 		List<PreciseRectangle> bounds = new LinkedList<>();
-		yLoop:
+		
 		for (int y = frameMinY + minBlobHeight; y < frameMaxY - minBlobHeight; y+= minBlobHeight) {
 			List<PreciseRectangle> rowBounds = new ArrayList<>();
 			for (PreciseRectangle rectangle : bounds)

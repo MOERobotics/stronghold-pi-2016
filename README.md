@@ -1,6 +1,9 @@
+<table><tr><th><h1>This repo is archived & made public for future use and inspiration. If you want to make changes to the code, please make a fork on GitHub.</h1>
+<br/>
+<h6>If you end up doing something cool with this code, please <a href="moe365.org">contact us.</a></h6></th></tr></table>
 # MOE 365 FRC Stronghold Raspberry Pi Code
 <table><tr><th colspan=2>Stronghold 2016 Code</th></tr><tr><td><a href="https://github.com/MOERobotics/2016Stronghold-CaMOElot">RoboRio</a></td><td>Raspberry Pi</td></tr></table>
-Raspberry Pi code for FRC stronghold challenge.
+Raspberry Pi code for 2016 FIRST FRC Stronghold challenge.
 
 # Details
 The program is written in a heavily modular fashion, where (almost?) every segment of code can be disabled at runtime. This modularity is advantageous at competitions, as allows massive changes in the system with no or minimal changes to the code. In fact, we were able to use GRIP to detect the goal (as a fallback, in case the head referees decided that the flashing LED was against the rules), instead of the normal image processing module, by only changing a few command line flags. In spite of this model, the program is by no means fragmented, and each module is deeply integrated with multiple others.
@@ -19,3 +22,5 @@ Our image processor works by not looking for places in an image that are lit up,
 
 ## Data Broadcasting
 To keep latency and bandwidth low, we developed a custom UDP packet structure to communicate to the RoboRio.
+
+<sup><sub>All rights reserved &copy; 2016 MOE 365 Robotics</sub></sup>
